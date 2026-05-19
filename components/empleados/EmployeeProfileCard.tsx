@@ -6,6 +6,9 @@ import { MapPin, Calendar, MoreVertical } from "lucide-react";
 import { Empleado, EstadoEmpleado } from "@/services/empleadosService";
 import ChangeStatusModal from "@/components/empleados/ChangeStatusModal";
 import ToastNotification from "@/components/ToastNotification";
+import EditInfoModal from "@/components/perfil/EditInfoModal";
+import { Contrato, obtenerContratosPorEmpleado } from "@/services/contratosService";
+import { PerformanceMain, PerformanceSidebar } from "@/components/perfil/PerformanceTab";
 
 interface Props {
   empleado: Empleado;
@@ -30,24 +33,19 @@ const CONFIG_ESTADO: Record<
   },
   RETIRADO: {
     etiqueta: "Retired",
-    trackColor: "bg-gray-300",
-    thumbPosition: "translate-x-[36px]",
-    labelColor: "text-gray-400",
+    trackColor: "bg-rose-500",
+    thumbPosition: "translate-x-[22px]",
+    labelColor: "text-rose-500",
   },
 } as const;
 
-// Toggle visual — solo representación, no clickeable
 function StatusToggle({ estado }: { estado: EstadoEmpleado }) {
   const config = CONFIG_ESTADO[estado];
 
   return (
     <div className="flex items-center gap-2.5">
       <span className="text-xs font-medium text-[#8aa3ad]">Status</span>
-      {/* Track */}
-      <div
-        className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${config.trackColor}`}
-      >
-        {/* Thumb */}
+      <div className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${config.trackColor}`}>
         <span
           className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${config.thumbPosition}`}
         />
@@ -66,9 +64,18 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [modalEstadoAbierto, setModalEstadoAbierto] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
+  const [toastMsg, setToastMsg] = useState({ title: "", message: "" });
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const iniciales = `${empleado.nombre.charAt(0)}${empleado.apellidos.charAt(0)}`.toUpperCase();
+  // Local editable state to reflect edits performed via modal
+  const [nombreLocal, setNombreLocal] = useState(empleado.nombre);
+  const [apellidosLocal, setApellidosLocal] = useState(empleado.apellidos);
+  const [emailLocal, setEmailLocal] = useState(empleado.email);
+  const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
+  const [toastEditVisible, setToastEditVisible] = useState(false);
+  const [contratos, setContratos] = useState<Contrato[]>([]);
+
+  const iniciales = `${(nombreLocal || empleado.nombre).charAt(0)}${(apellidosLocal || empleado.apellidos).charAt(0)}`.toUpperCase();
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -80,12 +87,32 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    obtenerContratosPorEmpleado(empleado.id).then((data) => {
+      if (!mounted) return;
+      setContratos(data);
+    });
+    return () => { mounted = false; };
+  }, [empleado.id]);
+
   const handleConfirmarEstado = async (
     nuevoEstado: EstadoEmpleado,
     _motivo: string
   ) => {
     onEstadoCambiado(nuevoEstado);
     setModalEstadoAbierto(false);
+    setToastMsg(
+      nuevoEstado === "RETIRADO"
+        ? {
+            title: "Proceso de retiro completado",
+            message: "El empleado fue retirado del sistema correctamente.",
+          }
+        : {
+            title: "Estado actualizado con éxito",
+            message: "El estado del empleado fue cambiado correctamente.",
+          }
+    );
     setToastVisible(true);
   };
 
@@ -107,7 +134,7 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                       ? "bg-emerald-500"
                       : empleado.estado === "SUSPENDIDO"
                       ? "bg-amber-400"
-                      : "bg-gray-300"
+                      : "bg-rose-500"
                   }`}
                 />
               </div>
@@ -115,7 +142,7 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
               {/* Info */}
               <div className="flex-1 pt-1">
                 <h1 className="text-3xl font-bold text-[#0F1819]">
-                  {empleado.nombre} {empleado.apellidos}
+                    {nombreLocal} {apellidosLocal}
                 </h1>
                 <p className="mt-1 font-medium text-[#8aa3ad]">
                   {empleado.cargo} • {empleado.departamento}
@@ -136,7 +163,7 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
               </div>
             </div>
 
-            {/* Toggle visual + menú */}
+            {/* Toggle + menú */}
             <div className="flex flex-col items-end gap-3 shrink-0">
               <StatusToggle estado={empleado.estado} />
 
@@ -150,12 +177,15 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
 
                 {menuAbierto && (
                   <div className="absolute right-0 mt-1 bg-white border border-[#d1dde2] rounded-xl shadow-lg py-2 z-20 min-w-max">
-                    <button
-                      className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-[#f4f7f8] flex items-center gap-2 transition-colors"
-                      onClick={() => setMenuAbierto(false)}
-                    >
-                      Editar
-                    </button>
+                        <button
+                          className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-[#f4f7f8] flex items-center gap-2 transition-colors"
+                          onClick={() => {
+                            setMenuAbierto(false);
+                            setModalEditarAbierto(true);
+                          }}
+                        >
+                          Editar
+                        </button>
                     <button
                       className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-[#f4f7f8] flex items-center gap-2 transition-colors"
                       onClick={() => {
@@ -264,25 +294,44 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
             {tabActiva === "contratos" && (
               <div className="rounded-xl bg-white p-8 shadow-sm border border-[#e4ebee]">
                 <h2 className="mb-6 text-lg font-bold text-[#0F1819]">Contratos</h2>
-                <p className="py-12 text-center text-[#8aa3ad]">
-                  No hay contratos disponibles actualmente.
-                </p>
+                {contratos.length === 0 ? (
+                  <p className="py-12 text-center text-[#8aa3ad]">
+                    No hay contratos disponibles actualmente.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {contratos.map((contrato) => (
+                      <div key={contrato.id} className="rounded-xl border border-[#e8eef0] px-4 py-3">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-semibold text-[#0F1819]">{contrato.tipo}</p>
+                            <p className="text-xs text-[#8aa3ad] mt-0.5">
+                              {contrato.fechaInicio} {contrato.fechaFin ? `• ${contrato.fechaFin}` : "• Indefinido"}
+                            </p>
+                          </div>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md ${contrato.estado === "ACTIVO" ? "bg-emerald-50 text-emerald-600" : contrato.estado === "RENOVADO" ? "bg-sky-50 text-sky-600" : contrato.estado === "EXPIRADO" ? "bg-rose-50 text-rose-500" : "bg-slate-100 text-slate-500"}`}>
+                            {contrato.estado}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#576975] mt-2 line-clamp-2">
+                          {contrato.notas || "Sin notas registradas."}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
-            {tabActiva === "desempeño" && (
-              <div className="rounded-xl bg-white p-8 shadow-sm border border-[#e4ebee]">
-                <h2 className="mb-6 text-lg font-bold text-[#0F1819]">Desempeño</h2>
-                <p className="py-12 text-center text-[#8aa3ad]">
-                  No hay datos de desempeño disponibles actualmente.
-                </p>
-              </div>
-            )}
+            {tabActiva === "desempeño" && <PerformanceMain />}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            <div className="rounded-xl bg-white p-6 shadow-sm border border-[#e4ebee]">
+            {tabActiva === "desempeño" ? (
+              <PerformanceSidebar />
+            ) : (
+              <div className="rounded-xl bg-white p-6 shadow-sm border border-[#e4ebee]">
               <div className="mb-6 flex items-center gap-2 border-b border-[#f0f4f5] pb-4">
                 <span className="text-lg">📋</span>
                 <h3 className="font-bold text-[#0F1819]">Información Personal</h3>
@@ -291,7 +340,7 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">Email</p>
-                    <p className="break-words text-xs font-medium text-[#0F1819]">{empleado.email}</p>
+                        <p className="break-words text-xs font-medium text-[#0F1819]">{emailLocal}</p>
                   </div>
                   <div>
                     <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">Tipo</p>
@@ -313,40 +362,8 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                   <p className="text-xs font-medium text-[#0F1819]">{empleado.ubicacion}</p>
                 </div>
               </div>
-            </div>
-
-            {/* Digital pass */}
-            <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#0F1819] via-[#203D47] to-[#1E333A] p-6 text-white shadow-lg">
-              <div className="absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/5" />
-              <div className="absolute -bottom-8 -left-8 h-16 w-16 rounded-full bg-white/5" />
-              <div className="relative z-10">
-                <div className="mb-6 text-right">
-                  <span className="text-xs font-semibold tracking-wider opacity-60">
-                    EMPLOYEE DIGITAL PASS
-                  </span>
-                </div>
-                <div className="mb-6 flex h-32 items-center justify-center rounded-lg bg-white p-4 shadow-lg">
-                  <div className="grid grid-cols-3 gap-1 p-3">
-                    {[...Array(9)].map((_, i) => (
-                      <div
-                        key={i}
-                        className={`h-2 w-2 rounded-sm ${
-                          [0, 2, 4, 6, 8].includes(i) ? "bg-[#0F1819]" : "bg-[#ECEFF1]"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="border-t border-white/20 pt-4 text-center">
-                  <p className="text-base font-bold uppercase tracking-wide">
-                    {empleado.nombre} {empleado.apellidos}
-                  </p>
-                  <p className="mt-2 text-xs font-medium opacity-60">
-                    ID {empleado.codigoEmpleado}
-                  </p>
-                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -359,12 +376,39 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
         onConfirmar={handleConfirmarEstado}
       />
 
+      {/* Edit Info Modal */}
+      <EditInfoModal
+        isOpen={modalEditarAbierto}
+        onClose={() => setModalEditarAbierto(false)}
+        initialData={{
+          fullName: `${nombreLocal} ${apellidosLocal}`.trim(),
+          phoneNumber: "",
+          emailAddress: emailLocal,
+        }}
+        onSave={async (data) => {
+          // Simular actualización: actualizar estado local y mostrar toast
+          const parts = data.fullName.trim().split(" ");
+          setNombreLocal(parts.shift() ?? "");
+          setApellidosLocal(parts.join(" ") ?? "");
+          setEmailLocal(data.emailAddress);
+          setModalEditarAbierto(false);
+          setToastEditVisible(true);
+        }}
+      />
+
       {/* Toast */}
       <ToastNotification
         isVisible={toastVisible}
         onClose={() => setToastVisible(false)}
-        title="Estado actualizado con éxito"
-        message="El estado del empleado fue cambiado correctamente."
+        title={toastMsg.title}
+        message={toastMsg.message}
+      />
+
+      <ToastNotification
+        isVisible={toastEditVisible}
+        onClose={() => setToastEditVisible(false)}
+        title="Información actualizada"
+        message="Los datos del empleado fueron actualizados correctamente."
       />
     </div>
   );

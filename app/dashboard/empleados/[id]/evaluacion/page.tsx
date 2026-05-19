@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ChevronRight, ChevronDown, TrendingUp } from "lucide-react";
-import { Empleado, obtenerEmpleadoPorId } from "@/services/empleadosService";
+import { Empleado, obtenerEmpleadoPorId, guardarEvaluacion, Evaluation } from "@/services/empleadosService";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -368,7 +368,31 @@ export default function EvaluacionEmpleadoPage() {
             <button className="px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#d1dde2] text-[#203D47] hover:bg-gray-50 transition-colors">
               Save Draft
             </button>
-            <button className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500 text-white hover:bg-emerald-400 transition-colors">
+            <button
+              onClick={async () => {
+                if (!empleado) return;
+                // Construir payload de evaluación
+                const evalObj: Evaluation = {
+                  id: `${Date.now()}`,
+                  title: `${period} Review`,
+                  reviewer: "Current User",
+                  date: new Date().toLocaleDateString(),
+                  score: parseFloat(compositeScore),
+                  isRecent: true,
+                  competencies: competencies.map((c) => ({ name: c.label, score: parseFloat(c.score.toFixed(2)) })),
+                  observations,
+                };
+
+                try {
+                  await guardarEvaluacion(empId, evalObj);
+                  // Redirigir al detalle del empleado para ver la evaluación en desempeño
+                  router.push(`/dashboard/empleados/${empId}`);
+                } catch (err) {
+                  console.error("Error guardando evaluación:", err);
+                }
+              }}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500 text-white hover:bg-emerald-400 transition-colors"
+            >
               Confirm Evaluation
             </button>
           </div>

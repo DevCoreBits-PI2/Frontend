@@ -1,5 +1,7 @@
 "use client";
+import DeletePositionModal from "@/components/areas/positions/DeletePositionModal";
 
+import ViewPositionModal from "@/components/areas/positions/viewPositionModal";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   ChevronRight,
@@ -10,6 +12,7 @@ import {
   X,
   Pencil,
   Trash2,
+  Eye,
   Plus,
 } from "lucide-react";
 import {
@@ -190,7 +193,7 @@ function NewPositionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
         <div className="px-6 py-4 border-b border-[#BDD5EA] flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[#0F1819]">
@@ -292,6 +295,8 @@ function NewPositionModal({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function PositionsPage() {
+  const [posicionAVer, setPosicionAVer] = useState<Position | null>(null); //Nuevos estados
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null); //Nuevos estados
   const [positions, setPositions] = useState<Position[]>([]);
   const [activeTab, setActiveTab] = useState<ActiveTab>("All");
   const [search, setSearch] = useState("");
@@ -303,6 +308,8 @@ export default function PositionsPage() {
   const [modalLoading, setModalLoading] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [posicionAEliminar, setPosicionAEliminar] = useState<Position | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Fetch positions
   const fetchPositions = useCallback(async () => {
@@ -373,31 +380,29 @@ export default function PositionsPage() {
     }
   };
 
-  const handleDeletePosition = async (id: string) => {
-    if (!window.confirm("¿Estás seguro de que deseas eliminar esta posición?"))
-      return;
+ //Nuevo handler para eliminar posición
 
-    try {
-      setLoading(true);
-      await eliminarPosicion(id);
-      setOpenMenuId(null);
-      setToast({
-        title: "Éxito",
-        subtitle: "Posición eliminada correctamente",
-        type: "success",
-      });
-      await fetchPositions();
-    } catch (error) {
-      console.error("Error deleting position:", error);
-      setToast({
-        title: "Error",
-        subtitle: "No se pudo eliminar la posición",
-        type: "error",
-      });
-    }
-  };
+const handleAbrirEliminar = (position: Position) => {
+  setOpenMenuId(null);
+  setPosicionAEliminar(position);
+};
 
-  return (
+const handleConfirmarEliminar = async (position: Position) => {
+  try {
+    setDeleteLoading(true);
+    await eliminarPosicion(position.id);
+    setPosicionAEliminar(null);
+    setToast({ title: "Éxito", subtitle: "Posición eliminada correctamente", type: "success" });
+    await fetchPositions();
+  } catch (error) {
+    console.error("Error deleting position:", error);
+    setToast({ title: "Error", subtitle: "No se pudo eliminar la posición", type: "error" });
+  } finally {
+    setDeleteLoading(false);
+  }
+};
+
+return (
     <div className="min-h-screen bg-[#ECEFF1]">
       {/* Header */}
       <div className="bg-white border-b border-[#BDD5EA]">
@@ -409,7 +414,6 @@ export default function PositionsPage() {
             <ChevronRight className="w-4 h-4" />
             <span className="text-[#0F1819] font-medium">Posiciones</span>
           </div>
-
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-[#0F1819]">
               Gestión de Posiciones
@@ -442,8 +446,8 @@ export default function PositionsPage() {
                 {tab === "All"
                   ? "Todas las Posiciones"
                   : tab === "Hierarchy"
-                    ? "Jerarquía"
-                    : "Archivadas"}
+                  ? "Jerarquía"
+                  : "Archivadas"}
               </button>
             ))}
           </div>
@@ -495,15 +499,13 @@ export default function PositionsPage() {
 
             {/* Table Body */}
             <div className="divide-y divide-[#BDD5EA]">
-              {positions.map((position, idx) => (
+              {positions.map((position) => (
                 <div
                   key={position.id}
                   className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-gray-50 transition-colors"
                 >
                   <div className="col-span-3">
-                    <p className="font-semibold text-[#0F1819]">
-                      {position.nombre}
-                    </p>
+                    <p className="font-semibold text-[#0F1819]">{position.nombre}</p>
                     <p className="text-xs text-[#8aa3ad]">{position.id}</p>
                   </div>
 
@@ -519,14 +521,19 @@ export default function PositionsPage() {
                     <StatusBadge status={position.estado} />
                   </div>
 
-                  <div className="col-span-2 relative">
+                  <div className="col-span-2">
                     <button
                       data-menu-trigger
-                      onClick={() =>
-                        setOpenMenuId(
-                          openMenuId === position.id ? null : position.id
-                        )
-                      }
+                      onClick={(e) => {
+                        if (openMenuId === position.id) {
+                          setOpenMenuId(null);
+                          setMenuPos(null);
+                        } else {
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          setMenuPos({ top: rect.bottom + 4, left: rect.left - 120 });
+                          setOpenMenuId(position.id);
+                        }
+                      }}
                       className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
                     >
                       <MoreVertical className="w-5 h-5 text-[#8aa3ad]" />
@@ -534,6 +541,7 @@ export default function PositionsPage() {
 
                     {openMenuId === position.id && (
                       <div
+                      data-menu-trigger
                         ref={(el) => {
                           if (el) menuRefs.current[position.id] = el;
                         }}
@@ -544,7 +552,7 @@ export default function PositionsPage() {
                           Editar
                         </button>
                         <button
-                          onClick={() => handleDeletePosition(position.id)}
+                          onClick={() => handleAbrirEliminar(position)}
                           className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -559,6 +567,42 @@ export default function PositionsPage() {
           </>
         )}
       </div>
+
+      {/* Dropdown flotante — fuera de la tabla para evitar overflow-hidden */}
+      {openMenuId && menuPos && (
+        <div
+          data-menu-trigger
+          className="fixed bg-white border border-[#BDD5EA] rounded-lg shadow-lg py-2 z-50 min-w-max"
+          style={{ top: menuPos.top, left: menuPos.left }}
+        >
+          <button
+            onClick={() => {
+              const pos = positions.find((p) => p.id === openMenuId);
+              if (pos) {
+                setOpenMenuId(null);
+                setMenuPos(null);
+                setPosicionAVer(pos);
+              }
+            }}
+            className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-gray-100 flex items-center gap-2 transition-colors"
+          >
+            <Eye className="w-4 h-4" />
+            Ver detalles
+          </button>
+          <button
+            className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-gray-100 flex items-center gap-2 transition-colors"
+          >
+            <Pencil className="w-4 h-4" />
+            Editar
+          </button>
+          <button
+            className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            Eliminar
+          </button>
+        </div>
+      )}
 
       {/* Pagination */}
       {!loading && positions.length > 0 && totalPages > 1 && (
@@ -606,12 +650,28 @@ export default function PositionsPage() {
         />
       )}
 
-      {/* New Position Modal */}
+      {/* Modales */}
       <NewPositionModal
         isOpen={showNewModal}
         onClose={() => setShowNewModal(false)}
         onSave={handleNewPosition}
         isLoading={modalLoading}
+      />
+      {/*Nuevo modal de eliminación de posiciones*/}
+      <DeletePositionModal
+  isOpen={posicionAEliminar !== null}
+  position={posicionAEliminar}
+  onCerrar={() => setPosicionAEliminar(null)}
+  onEliminada={async () => {
+    setPosicionAEliminar(null);
+    await fetchPositions();
+  }}
+/>
+
+      <ViewPositionModal
+        isOpen={posicionAVer !== null}
+        position={posicionAVer}
+        onCerrar={() => setPosicionAVer(null)}
       />
     </div>
   );

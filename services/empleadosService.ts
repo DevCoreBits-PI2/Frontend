@@ -14,6 +14,37 @@ export interface Empleado {
   foto: string;
 }
 
+export interface EvaluationCompetency {
+  name: string;
+  score: number;
+}
+
+export interface Evaluation {
+  id: string;
+  title: string;
+  reviewer: string;
+  date: string;
+  score: number;
+  isRecent?: boolean;
+  competencies: EvaluationCompetency[];
+  observations?: string;
+}
+
+// In-memory evaluations store keyed by empleado id (mock persistence)
+const EVALUATIONS_STORE: Record<string, Evaluation[]> = {};
+
+export const guardarEvaluacion = async (empleadoId: string, evaluation: Evaluation): Promise<Evaluation> => {
+  await new Promise((r) => setTimeout(r, 200));
+  if (!EVALUATIONS_STORE[empleadoId]) EVALUATIONS_STORE[empleadoId] = [];
+  EVALUATIONS_STORE[empleadoId].unshift(evaluation);
+  return evaluation;
+};
+
+export const obtenerEvaluacionesEmpleado = async (empleadoId: string): Promise<Evaluation[]> => {
+  await new Promise((r) => setTimeout(r, 180));
+  return EVALUATIONS_STORE[empleadoId] ?? [];
+};
+
 export const EMPLEADOS_MOCK: Empleado[] = [
   {
     id: "9284",
