@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, Calendar, Edit3 } from 'lucide-react';
+import { MapPin, Calendar, Edit3, LockKeyhole } from 'lucide-react';
 
 import { UserProfile } from '@/types/funcionario';
 import { PerformanceMain, PerformanceSidebar } from './PerformanceTab';
+import ChangePasswordModal from './ChangePasswordModal';
+import ToastNotification from '@/components/ToastNotification';
 
 interface UserProfileCardProps {
   user: UserProfile;
@@ -14,6 +16,13 @@ interface UserProfileCardProps {
 export default function UserProfileCard({ user, onEdit }: UserProfileCardProps) {
   const [activeTab, setActiveTab]     = useState<'trayectoria' | 'contratos' | 'desempeño'>('trayectoria');
   const [statusActivo, setStatusActivo] = useState(user.estado === 'ACTIVO');
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [passwordToastVisible, setPasswordToastVisible] = useState(false);
+
+  const handleSavePassword = async () => {
+    setIsPasswordModalOpen(false);
+    setPasswordToastVisible(true);
+  };
 
   return (
     <div className="min-h-screen bg-platinum-100">
@@ -86,6 +95,14 @@ export default function UserProfileCard({ user, onEdit }: UserProfileCardProps) 
               >
                 <Edit3 className="h-4 w-4" />
                 Editar Información
+              </button>
+
+              <button
+                onClick={() => setIsPasswordModalOpen(true)}
+                className="flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-400"
+              >
+                <LockKeyhole className="h-4 w-4" />
+                Editar Contraseña
               </button>
             </div>
           </div>
@@ -261,6 +278,19 @@ export default function UserProfileCard({ user, onEdit }: UserProfileCardProps) 
           </div>
         </div>
       </div>
+
+        <ChangePasswordModal
+          isOpen={isPasswordModalOpen}
+          onClose={() => setIsPasswordModalOpen(false)}
+          onSave={handleSavePassword}
+        />
+
+        <ToastNotification
+          isVisible={passwordToastVisible}
+          onClose={() => setPasswordToastVisible(false)}
+          title="Contraseña actualizada"
+          message="La contraseña se cambió correctamente."
+        />
     </div>
   );
 }

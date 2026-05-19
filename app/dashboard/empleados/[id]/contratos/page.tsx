@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { ChevronRight, Download, Plus, Calendar } from "lucide-react";
 
 import { Empleado, obtenerEmpleadoPorId } from "@/services/empleadosService";
-import { Contrato, obtenerContratosPorEmpleado } from "@/services/contratosService";
+import { Contrato, EstadoContrato, ValidezContrato, obtenerContratosPorEmpleado } from "@/services/contratosService";
 import ContratosTable from "@/components/contratos/ContratosTable";
 import ContractToast from "@/components/contratos/ContractToast";
 
@@ -28,6 +28,17 @@ export default function PaginaContratosEmpleado() {
     if (searchParams.get("actualizado") === "1") return "Contract updated successfully.";
     return null;
   });
+
+  const recargarContratos = () => {
+    obtenerContratosPorEmpleado(empleadoId)
+      .then(setContratos)
+      .catch(() => setError("No se pudieron cargar los contratos."));
+  };
+
+  const handleContratoRenovado = () => {
+    recargarContratos();
+    setToast("Contrato renovado con éxito");
+  };
 
   const filtroEstado = searchParams.get("estado") ?? "ALL";
 
@@ -133,26 +144,11 @@ export default function PaginaContratosEmpleado() {
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="border-b border-[#e8eef0] mb-6 flex items-center gap-6">
-              {[
-                { etiqueta: "Career Path", activo: false },
-                { etiqueta: "Contracts", activo: true },
-                { etiqueta: "Performance", activo: false },
-                { etiqueta: "Digital ID", activo: false },
-              ].map((t) => (
-                <button
-                  key={t.etiqueta}
-                  type="button"
-                  className={`pb-3 text-sm transition-colors border-b-2 -mb-[1px] ${
-                    t.activo
-                      ? "border-emerald-500 text-emerald-600 font-semibold"
-                      : "border-transparent text-[#8aa3ad] hover:text-[#0F1819]"
-                  }`}
-                >
-                  {t.etiqueta}
-                </button>
-              ))}
+            <div className="mb-6 flex items-center justify-between border-b border-[#e8eef0] pb-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#8aa3ad]">Section</p>
+                <h2 className="text-base font-semibold text-[#0F1819]">Contracts</h2>
+              </div>
             </div>
 
             {/* Filtros y boton */}
@@ -212,7 +208,22 @@ export default function PaginaContratosEmpleado() {
               </div>
             </div>
 
-            <ContratosTable contratos={contratosFiltrados} />
+            <ContratosTable
+              contratos={contratosFiltrados}
+              onVoidSuccess={(id) => {
+                setContratos((prev) =>
+                  prev.map((c) =>
+                    c.id === id
+                      ? { ...c, estado: "ANULADO" as EstadoContrato, validez: "VOIDED" as ValidezContrato }
+                      : c
+                  )
+                );
+                setToast("Contract voided successfully.");
+              }}
+              empleadoNombre={`${empleado.nombre} ${empleado.apellidos}`}
+              empleadoCodigo={empleado.codigoEmpleado}
+              onContratoRenovado={handleContratoRenovado}
+            />
 
             <p className="text-xs text-[#8aa3ad] mt-4">
               Showing {contratosFiltrados.length} contracts of historical records

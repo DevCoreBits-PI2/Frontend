@@ -44,8 +44,42 @@ export interface RegisterPayload {
   contractType?: string;
 }
 
-export const enviarRegistroMock = async (payload: RegisterPayload) => {
+export type RegisterErrorCode = "DUPLICATE_DOCUMENT";
+
+export interface RegisterResult {
+  success: boolean;
+  employeeId?: string;
+  payload?: RegisterPayload;
+  errorCode?: RegisterErrorCode;
+  errorMessage?: string;
+}
+
+// Documentos ya registrados (mock). En produccion vendria del backend.
+export const REGISTERED_DOCUMENTS_MOCK = new Set<string>([
+  "12345678",
+  "87654321",
+  "1098765432",
+]);
+
+export const isDocumentDuplicated = (documentNumber?: string): boolean => {
+  if (!documentNumber) return false;
+  return REGISTERED_DOCUMENTS_MOCK.has(documentNumber.trim());
+};
+
+export const enviarRegistroMock = async (
+  payload: RegisterPayload,
+): Promise<RegisterResult> => {
   await new Promise((r) => setTimeout(r, 800));
+
+  if (isDocumentDuplicated(payload.documentNumber)) {
+    return {
+      success: false,
+      errorCode: "DUPLICATE_DOCUMENT",
+      errorMessage:
+        "Ya existe un empleado registrado en el sistema con este número de documento. Por favor, inténtalo de nuevo con un número de documento válido.",
+    };
+  }
+
   // generar id tipo EMP-YYYY-NNN
   const year = new Date().getFullYear();
   const random = String(Math.floor(Math.random() * 900) + 100);

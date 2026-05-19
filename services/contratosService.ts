@@ -129,10 +129,70 @@ export const actualizarContrato = async (
   return CONTRATOS_MOCK[index];
 };
 
+export interface RenovarContratoDTO {
+  contratoActualId: string;
+  tipo: TipoContrato;
+  fechaInicio: string;
+  fechaFin: string | null;
+  salarioBase: number;
+  notas: string;
+  documentoNombre?: string;
+}
+
+export interface ResultadoRenovacion {
+  contratoAnterior: Contrato;
+  contratoNuevo: Contrato;
+}
+
+export const renovarContrato = async (
+  datos: RenovarContratoDTO,
+): Promise<ResultadoRenovacion> => {
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
+  const index = CONTRATOS_MOCK.findIndex((c) => c.id === datos.contratoActualId);
+  if (index === -1) throw new Error("Contrato no encontrado");
+
+  // Marcar el contrato actual como renovado
+  CONTRATOS_MOCK[index] = {
+    ...CONTRATOS_MOCK[index],
+    estado: "RENOVADO",
+    validez: "COMPLETED",
+  };
+
+  const contratoAnterior = CONTRATOS_MOCK[index];
+
+  // Crear el nuevo contrato activo
+  const contratoNuevo: Contrato = {
+    id: `c-${Date.now()}`,
+    idEmpleado: contratoAnterior.idEmpleado,
+    tipo: datos.tipo,
+    fechaInicio: datos.fechaInicio,
+    fechaFin: datos.fechaFin,
+    salarioBase: datos.salarioBase,
+    notas: datos.notas,
+    documentoNombre: datos.documentoNombre,
+    estado: "ACTIVO",
+    validez: "ONGOING",
+    creadoEn: new Date().toISOString().slice(0, 10),
+  };
+
+  CONTRATOS_MOCK.unshift(contratoNuevo);
+
+  return { contratoAnterior, contratoNuevo };
+};
+
 export const eliminarContrato = async (id: string): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, 250));
   const index = CONTRATOS_MOCK.findIndex((c) => c.id === id);
   if (index !== -1) CONTRATOS_MOCK.splice(index, 1);
+};
+
+export const anularContrato = async (id: string): Promise<Contrato> => {
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const index = CONTRATOS_MOCK.findIndex((c) => c.id === id);
+  if (index === -1) throw new Error("Contrato no encontrado");
+  CONTRATOS_MOCK[index] = { ...CONTRATOS_MOCK[index], estado: "ANULADO", validez: "VOIDED" };
+  return CONTRATOS_MOCK[index];
 };
 
 // Reglas de validacion para mostrar el panel "Validation Status"

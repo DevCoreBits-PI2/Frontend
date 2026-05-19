@@ -4,7 +4,13 @@ import StepIndicator from "../../../../components/employees/register/StepIndicat
 import PersonalDataStep from "../../../../components/employees/register/PersonalDataStep";
 import WorkDetailsStep from "../../../../components/employees/register/WorkDetailsStep";
 import ReviewStep from "../../../../components/employees/register/ReviewStep";
-import { AREAS_MOCK, POSITIONS_MOCK, enviarRegistroMock } from "../../../../services/registerEmployeeService";
+import DuplicateDocumentModal from "../../../../components/employees/register/DuplicateDocumentModal";
+import {
+  AREAS_MOCK,
+  POSITIONS_MOCK,
+  enviarRegistroMock,
+  isDocumentDuplicated,
+} from "../../../../services/registerEmployeeService";
 import { useRouter } from "next/navigation";
 
 const Page = () => {
@@ -12,6 +18,8 @@ const Page = () => {
   const [step, setStep] = useState(1);
   const [employeeId, setEmployeeId] = useState<string | undefined>(undefined);
   const [data, setData] = useState<any>({});
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateMessage, setDuplicateMessage] = useState<string | undefined>(undefined);
 
   const patch = (p: any) => setData((d: any) => ({ ...d, ...p }));
 
@@ -26,6 +34,13 @@ const Page = () => {
   }, [data.areaId]);
 
   const next = async () => {
+    // Validacion temprana del numero de documento al salir del paso 1
+    if (step === 1 && isDocumentDuplicated(data.documentNumber)) {
+      setDuplicateMessage(undefined);
+      setShowDuplicateModal(true);
+      return;
+    }
+
     if (step < 3) {
       setStep(step + 1);
     } else {
@@ -35,8 +50,17 @@ const Page = () => {
         setEmployeeId(res.employeeId);
         // Redirigir al directorio de empleados después de confirmar
         setTimeout(() => router.push('/dashboard/empleados'), 1000);
+      } else if (res.errorCode === "DUPLICATE_DOCUMENT") {
+        setDuplicateMessage(res.errorMessage);
+        setShowDuplicateModal(true);
       }
     }
+  };
+
+  const handleTryAgainDuplicate = () => {
+    setShowDuplicateModal(false);
+    setStep(1);
+    patch({ documentNumber: "" });
   };
 
   const back = () => {
@@ -54,14 +78,6 @@ const Page = () => {
             <span className="text-[#8aa3ad]">Employee Directory</span>
             <span className="text-[#8aa3ad]">/</span>
             <span className="text-[#203D47] font-semibold">Register Employee</span>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={next}
-              className="px-4 py-2 bg-[#2ECC71] text-white rounded text-sm font-semibold hover:bg-green-600 transition"
-            >
-              {step === 3 ? "Confirm Registration" : "Save and Continue →"}
-            </button>
           </div>
         </div>
 
@@ -122,6 +138,13 @@ const Page = () => {
           </div>
         </div>
       </div>
+
+      <DuplicateDocumentModal
+        isOpen={showDuplicateModal}
+        message={duplicateMessage}
+        onCancel={() => setShowDuplicateModal(false)}
+        onTryAgain={handleTryAgainDuplicate}
+      />
     </div>
   );
 };
