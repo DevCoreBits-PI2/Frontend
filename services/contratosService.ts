@@ -187,6 +187,14 @@ export const eliminarContrato = async (id: string): Promise<void> => {
   if (index !== -1) CONTRATOS_MOCK.splice(index, 1);
 };
 
+export const anularContrato = async (id: string): Promise<Contrato> => {
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const index = CONTRATOS_MOCK.findIndex((c) => c.id === id);
+  if (index === -1) throw new Error("Contrato no encontrado");
+  CONTRATOS_MOCK[index] = { ...CONTRATOS_MOCK[index], estado: "ANULADO", validez: "VOIDED" };
+  return CONTRATOS_MOCK[index];
+};
+
 // Reglas de validacion para mostrar el panel "Validation Status"
 export interface ResultadoValidacion {
   rangoFechasValido: boolean;

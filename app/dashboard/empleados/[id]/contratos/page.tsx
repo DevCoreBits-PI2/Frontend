@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { ChevronRight, Download, Plus, Calendar } from "lucide-react";
 
 import { Empleado, obtenerEmpleadoPorId } from "@/services/empleadosService";
-import { Contrato, obtenerContratosPorEmpleado } from "@/services/contratosService";
+import { Contrato, EstadoContrato, ValidezContrato, obtenerContratosPorEmpleado } from "@/services/contratosService";
 import ContratosTable from "@/components/contratos/ContratosTable";
 import ContractToast from "@/components/contratos/ContractToast";
 
@@ -210,6 +210,16 @@ export default function PaginaContratosEmpleado() {
 
             <ContratosTable
               contratos={contratosFiltrados}
+              onVoidSuccess={(id) => {
+                setContratos((prev) =>
+                  prev.map((c) =>
+                    c.id === id
+                      ? { ...c, estado: "ANULADO" as EstadoContrato, validez: "VOIDED" as ValidezContrato }
+                      : c
+                  )
+                );
+                setToast("Contract voided successfully.");
+              }}
               empleadoNombre={`${empleado.nombre} ${empleado.apellidos}`}
               empleadoCodigo={empleado.codigoEmpleado}
               onContratoRenovado={handleContratoRenovado}
