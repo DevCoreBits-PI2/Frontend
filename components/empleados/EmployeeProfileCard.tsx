@@ -2,9 +2,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MapPin, Calendar, MoreVertical } from "lucide-react";
+import { MapPin, Calendar, MoreVertical, Plus } from "lucide-react";
 import { Empleado, EstadoEmpleado } from "@/services/empleadosService";
 import ChangeStatusModal from "@/components/empleados/ChangeStatusModal";
+import RegisterWorkChangeModal from "@/components/empleados/RegisterWorkChangeModal";
 import ToastNotification from "@/components/ToastNotification";
 import EditInfoModal from "@/components/perfil/EditInfoModal";
 import { Contrato, obtenerContratosPorEmpleado } from "@/services/contratosService";
@@ -63,6 +64,7 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
   const [tabActiva, setTabActiva] = useState<TabActiva>("trayectoria");
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [modalEstadoAbierto, setModalEstadoAbierto] = useState(false);
+  const [modalCambioAbierto, setModalCambioAbierto] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMsg, setToastMsg] = useState({ title: "", message: "" });
   const menuRef = useRef<HTMLDivElement>(null);
@@ -235,9 +237,18 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
           <div className="col-span-2">
             {tabActiva === "trayectoria" && (
               <div className="rounded-xl bg-white p-8 shadow-sm border border-[#e4ebee]">
-                <h2 className="mb-8 text-lg font-bold text-[#0F1819]">
-                  Trayectoria Profesional
-                </h2>
+                <div className="mb-8 flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-[#0F1819]">
+                    Trayectoria Profesional
+                  </h2>
+                  <button
+                    onClick={() => setModalCambioAbierto(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-400 rounded-lg transition-colors"
+                  >
+                    <Plus size={13} />
+                    Register Work Change
+                  </button>
+                </div>
                 <div className="space-y-8">
                   {[
                     {
@@ -368,7 +379,7 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Modal estado */}
       <ChangeStatusModal
         isOpen={modalEstadoAbierto}
         estadoActual={empleado.estado}
@@ -376,6 +387,13 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
         onConfirmar={handleConfirmarEstado}
       />
 
+      {/* Modal registro de cambio laboral */}
+      <RegisterWorkChangeModal
+        isOpen={modalCambioAbierto}
+        onCerrar={() => setModalCambioAbierto(false)}
+        onGuardar={async (_datos) => {
+          setModalCambioAbierto(false);
+          setToastVisible(true);
       {/* Edit Info Modal */}
       <EditInfoModal
         isOpen={modalEditarAbierto}
