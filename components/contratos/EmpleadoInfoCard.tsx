@@ -27,7 +27,7 @@ export default function EmpleadoInfoCard({ empleado }: EmpleadoInfoCardProps) {
         <p className="text-xs text-[#8aa3ad] mt-0.5">{empleado.cargo}</p>
         {empleado.estado === "ACTIVO" && (
           <span className="mt-3 inline-flex items-center gap-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md">
-            Active Employee
+            Empleado Activo
           </span>
         )}
       </div>
@@ -35,15 +35,15 @@ export default function EmpleadoInfoCard({ empleado }: EmpleadoInfoCardProps) {
       {/* Datos */}
       <div className="mt-5 pt-4 border-t border-[#f0f4f5] flex flex-col gap-3 text-xs">
         <div className="flex items-center justify-between">
-          <span className="text-[#8aa3ad]">Employee ID</span>
+          <span className="text-[#8aa3ad]">ID de Empleado</span>
           <span className="text-[#0F1819] font-semibold">#{empleado.codigoEmpleado}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-[#8aa3ad]">Department</span>
+          <span className="text-[#8aa3ad]">Departamento</span>
           <span className="text-[#0F1819] font-semibold">{empleado.departamento}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-[#8aa3ad]">Location</span>
+          <span className="text-[#8aa3ad]">Ubicación</span>
           <span className="text-[#0F1819] font-semibold">{empleado.ubicacion}</span>
         </div>
       </div>

@@ -43,7 +43,7 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
         {/* Full Name */}
         <div>
           <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-            Full Name
+            Nombre Completo
           </label>
           <input
             type="text"
@@ -58,14 +58,14 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-              Document Type
+              Tipo de Documento
             </label>
             <select
               value={data.documentType || ""}
               onChange={(e) => onChange({ documentType: e.target.value })}
               className="w-full px-4 py-3 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71]  text-gray-700"
             >
-              <option value="">Select Type</option>
+              <option value="">Seleccionar tipo</option>
               {DOCUMENT_TYPES.map((d: any) => (
                 <option key={d.id} value={d.id}>
                   {d.nombre}
@@ -75,7 +75,7 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
           </div>
           <div>
             <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-              Document Number
+              Número de Documento
             </label>
             <input
               type="text"
@@ -91,7 +91,7 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-              Email Address
+              Correo Electrónico
             </label>
             <input
               type="email"
@@ -103,7 +103,7 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
           </div>
           <div>
             <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-              Phone Number
+              Teléfono
             </label>
             <input
               type="tel"
@@ -118,17 +118,17 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
         {/* Documents */}
         <div>
           <label className="block text-xs font-semibold text-[#203D47] uppercase mb-3">
-            Upload Employee Documents
+            Subir Documentos del Empleado
           </label>
           <div
             onClick={() => docsInputRef.current?.click()}
             className="p-8 border-2 border-dashed border-[#8aa3ad] rounded-md cursor-pointer hover:bg-[#ECEFF1] transition text-center"
           >
             <div className="text-sm text-[#8aa3ad] mb-2">
-              Drag & drop files here or click to browse
+              Arrastra y suelta los archivos aquí o haz clic para explorar
             </div>
             <div className="text-xs text-[#8aa3ad]">
-              PDF, DOCX, PNG, JPG — max 10MB each
+              PDF, DOCX, PNG, JPG — máximo 10MB cada uno
             </div>
             <input
               ref={docsInputRef}
@@ -155,7 +155,7 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
                     <div className="flex-1">
                       <div className="text-sm text-[#203D47] font-medium">{f.name}</div>
                       <div className="text-xs text-[#8aa3ad]">
-                        {bytesToKb(f.size)} • Ready to upload
+                        {bytesToKb(f.size)} • Listo para subir
                       </div>
                     </div>
                   </div>

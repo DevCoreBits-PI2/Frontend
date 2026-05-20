@@ -65,7 +65,7 @@ function NodeWithChildren({
                   e.stopPropagation();
                   onAddChild?.(node);
                 }}
-                title="Add child position"
+                title="Agregar posición hija"
                 className="w-6 h-6 rounded-full bg-emerald-500 hover:bg-emerald-400 flex items-center justify-center text-white transition-colors shadow-sm z-10"
               >
                 <Plus size={12} />
@@ -178,11 +178,11 @@ export default function OrgTree({
     <div className="relative flex-1 overflow-hidden flex flex-col">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#f0f4f5] shrink-0">
-        <span className="text-sm font-semibold text-[#0F1819]">Hierarchy Tree</span>
+        <span className="text-sm font-semibold text-[#0F1819]">Árbol Jerárquico</span>
         <div className="flex items-center gap-0.5">
-          <ZoomBtn onClick={onZoomOut} title="Zoom out"><ZoomOut size={14} /></ZoomBtn>
-          <ZoomBtn onClick={onZoomIn} title="Zoom in"><ZoomIn size={14} /></ZoomBtn>
-          <ZoomBtn onClick={onReset} title="Fit view"><Maximize2 size={14} /></ZoomBtn>
+          <ZoomBtn onClick={onZoomOut} title="Alejar"><ZoomOut size={14} /></ZoomBtn>
+          <ZoomBtn onClick={onZoomIn} title="Acercar"><ZoomIn size={14} /></ZoomBtn>
+          <ZoomBtn onClick={onReset} title="Ajustar vista"><Maximize2 size={14} /></ZoomBtn>
         </div>
       </div>
 

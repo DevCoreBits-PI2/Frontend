@@ -37,13 +37,13 @@ export default function ErrorModal({ message, onClose, onTryAgain }: Props) {
             onClick={onClose}
             className="px-5 py-2.5 text-sm font-semibold text-[#4a7880] hover:text-[#0F1819] transition-colors"
           >
-            Cancel
+            Cancelar
           </button>
           <button
             onClick={onTryAgain}
             className="px-6 py-2.5 bg-rose-500 hover:bg-rose-400 text-white text-sm font-semibold rounded-xl transition-colors"
           >
-            Try again
+            Reintentar
           </button>
         </div>
       </div>

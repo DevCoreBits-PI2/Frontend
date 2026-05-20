@@ -15,7 +15,7 @@ interface UserProfileCardProps {
 
 export default function UserProfileCard({ user, onEdit }: UserProfileCardProps) {
   const [activeTab, setActiveTab]     = useState<'trayectoria' | 'contratos' | 'desempeño'>('trayectoria');
-  const [statusActivo, setStatusActivo] = useState(user.estado === 'ACTIVO');
+  const isActivo = user.estado === 'ACTIVO';
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordToastVisible, setPasswordToastVisible] = useState(false);
 
@@ -54,7 +54,7 @@ export default function UserProfileCard({ user, onEdit }: UserProfileCardProps) 
                   </span>
                   <span className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-platinum-600" />
-                    Joined {new Date(user.fechaIngreso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                    Ingresó {new Date(user.fechaIngreso).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}
                   </span>
                   <span className="flex items-center gap-2">
                     <MapPin className="h-4 w-4 text-platinum-600" />
@@ -65,25 +65,23 @@ export default function UserProfileCard({ user, onEdit }: UserProfileCardProps) 
             </div>
 
             <div className="flex flex-col items-end gap-3 shrink-0">
-              {/* Status toggle */}
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-medium text-platinum-600">Status</span>
+              {/* Status indicator (read-only) */}
+              <div className="flex items-center gap-3" aria-label={`Estado: ${isActivo ? 'Activo' : 'Inactivo'}`}>
+                <span className="text-xs font-medium text-platinum-600">Estado</span>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setStatusActivo((v) => !v)}
-                    className={`relative w-10 h-5.5 rounded-full transition-colors duration-200 ${
-                      statusActivo ? 'bg-emerald-500' : 'bg-gray-300'
+                  <div
+                    className={`relative w-10 h-5.5 rounded-full ${
+                      isActivo ? 'bg-emerald-500' : 'bg-gray-300'
                     }`}
                   >
                     <span
-                      className={`absolute top-0.75 left-0.75 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                        statusActivo ? 'translate-x-4.5' : 'translate-x-0'
+                      className={`absolute top-0.75 left-0.75 w-4 h-4 bg-white rounded-full shadow-sm ${
+                        isActivo ? 'translate-x-4.5' : 'translate-x-0'
                       }`}
                     />
-                  </button>
-                  <span className={`text-sm font-semibold ${statusActivo ? 'text-emerald-500' : 'text-gray-400'}`}>
-                    {statusActivo ? 'Active' : 'Inactive'}
+                  </div>
+                  <span className={`text-sm font-semibold ${isActivo ? 'text-emerald-500' : 'text-gray-400'}`}>
+                    {isActivo ? 'Activo' : 'Inactivo'}
                   </span>
                 </div>
               </div>
@@ -139,28 +137,28 @@ export default function UserProfileCard({ user, onEdit }: UserProfileCardProps) 
           <div className="col-span-2">
             {activeTab === 'trayectoria' && (
               <div className="rounded-xl bg-white p-8 shadow-sm">
-                <h2 className="mb-8 text-lg font-bold text-jet-black-900">Career Timeline</h2>
+                <h2 className="mb-8 text-lg font-bold text-jet-black-900">Trayectoria Profesional</h2>
                 <div className="space-y-8">
                   {[
                     {
-                      fecha: 'JAN 2024',
-                      titulo: 'Promotion to Senior Architect',
-                      area: 'ENGINEERING HUB',
-                      descripcion: 'Transitioned to leadership role overseeing cloud infrastructure modernization projects across North American regions.',
+                      fecha: 'ENE 2024',
+                      titulo: 'Ascenso a Arquitecto Senior',
+                      area: 'CENTRO DE INGENIERÍA',
+                      descripcion: 'Transición a rol de liderazgo supervisando proyectos de modernización de infraestructura cloud en regiones de Norteamérica.',
                       icon: '●',
                     },
                     {
-                      fecha: 'JUNE 2021',
-                      titulo: 'Transferred to Cloud Division',
-                      area: 'STRATEGIC INFRASTRUCTURE',
-                      descripcion: 'Departmental move to align with corporate-wide transition towards serverless architecture.',
+                      fecha: 'JUN 2021',
+                      titulo: 'Traslado a División Cloud',
+                      area: 'INFRAESTRUCTURA ESTRATÉGICA',
+                      descripcion: 'Movimiento departamental alineado con la transición corporativa hacia arquitectura serverless.',
                       icon: '◆',
                     },
                     {
-                      fecha: 'MARCH 2019',
-                      titulo: 'Joined as Junior Developer',
-                      area: 'CORE PLATFORMS',
-                      descripcion: 'Onboarded into the graduate development program focused on legacy system maintenance.',
+                      fecha: 'MAR 2019',
+                      titulo: 'Ingreso como Desarrollador Junior',
+                      area: 'PLATAFORMAS CORE',
+                      descripcion: 'Incorporación al programa de desarrollo para graduados enfocado en mantenimiento de sistemas legados.',
                       icon: '■',
                     },
                   ].map((item, idx) => (
@@ -184,8 +182,8 @@ export default function UserProfileCard({ user, onEdit }: UserProfileCardProps) 
 
             {activeTab === 'contratos' && (
               <div className="rounded-xl bg-white p-8 shadow-sm">
-                <h2 className="mb-6 text-lg font-bold text-jet-black-900">Contracts</h2>
-                <p className="py-12 text-center text-platinum-700">No contracts available at this time.</p>
+                <h2 className="mb-6 text-lg font-bold text-jet-black-900">Contratos</h2>
+                <p className="py-12 text-center text-platinum-700">No hay contratos disponibles en este momento.</p>
               </div>
             )}
 
@@ -200,46 +198,46 @@ export default function UserProfileCard({ user, onEdit }: UserProfileCardProps) 
                 <div className="rounded-xl bg-white p-6 shadow-sm">
                   <div className="mb-6 flex items-center gap-2 border-b border-platinum-200 pb-4">
                     <span className="text-lg">📋</span>
-                    <h3 className="font-bold text-jet-black-900">Personal Info</h3>
+                    <h3 className="font-bold text-jet-black-900">Información Personal</h3>
                   </div>
                   <div className="space-y-5 text-sm">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Email</p>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Correo</p>
                         <p className="break-words text-xs font-medium text-jet-black-800">{user.email}</p>
                       </div>
                       <div>
-                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Phone Number</p>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Teléfono</p>
                         <p className="text-xs font-medium text-jet-black-800">{user.phone}</p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 pt-2">
                       <div>
-                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Job Role</p>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Cargo</p>
                         <p className="text-xs font-medium text-jet-black-800">{user.cargo}</p>
                       </div>
                       <div>
-                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Department</p>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Departamento</p>
                         <p className="text-xs font-medium text-jet-black-800">{user.area}</p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 pt-2">
                       <div>
-                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Birth Date</p>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Fecha de Nacimiento</p>
                         <p className="text-xs font-medium text-jet-black-800">
-                          {new Date(user.fechaNacimiento).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
+                          {new Date(user.fechaNacimiento).toLocaleDateString('es-ES', { month: '2-digit', day: '2-digit', year: 'numeric' })}
                         </p>
                       </div>
                       <div>
-                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Office Location</p>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Sede</p>
                         <p className="text-xs font-medium text-jet-black-800">{user.oficina}</p>
                       </div>
                     </div>
 
                     <div className="border-t border-platinum-200 pt-2">
-                      <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Reports To</p>
+                      <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Reporta A</p>
                       <p className="text-xs font-medium text-jet-black-800">{user.reportaA}</p>
                     </div>
                   </div>
@@ -251,7 +249,7 @@ export default function UserProfileCard({ user, onEdit }: UserProfileCardProps) 
 
                   <div className="relative z-10">
                     <div className="mb-6 text-right">
-                      <span className="text-xs font-semibold tracking-wider opacity-60">EMPLOYEE DIGITAL PASS</span>
+                      <span className="text-xs font-semibold tracking-wider opacity-60">PASE DIGITAL DE EMPLEADO</span>
                     </div>
 
                     <div className="mb-6 flex h-32 items-center justify-center rounded-lg bg-white p-4 shadow-lg">

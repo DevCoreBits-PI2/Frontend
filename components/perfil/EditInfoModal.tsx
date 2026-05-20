@@ -141,8 +141,8 @@ export default function EditInfoModal({
               <span className="text-[10px] font-bold leading-none text-white">i</span>
             </div>
             <div>
-              <p id="modal-title" className="text-sm font-bold text-amber-800">Edit Form</p>
-              <p className="text-xs text-amber-600">You can only edit this aspects</p>
+              <p id="modal-title" className="text-sm font-bold text-amber-800">Formulario de Edición</p>
+              <p className="text-xs text-amber-600">Solo puedes editar estos campos</p>
             </div>
           </div>
 
@@ -151,7 +151,7 @@ export default function EditInfoModal({
 
             {/* Full Name */}
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-[#1E333A]">Full Name</label>
+              <label className="text-sm font-medium text-[#1E333A]">Nombre Completo</label>
               <input
                 type="text"
                 value={fullName}
@@ -165,7 +165,7 @@ export default function EditInfoModal({
 
             {/* Phone Number */}
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-[#1E333A]">Phone Number</label>
+              <label className="text-sm font-medium text-[#1E333A]">Teléfono</label>
               <input
                 type="tel"
                 value={phoneNumber}
@@ -179,7 +179,7 @@ export default function EditInfoModal({
 
             {/* Email Address */}
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-[#1E333A]">Email Address</label>
+              <label className="text-sm font-medium text-[#1E333A]">Correo Electrónico</label>
               <input
                 type="email"
                 value={emailAddress}
@@ -193,7 +193,7 @@ export default function EditInfoModal({
 
             {/* Upload Photo */}
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-[#1E333A]">Upload Photo</label>
+              <label className="text-sm font-medium text-[#1E333A]">Subir Foto</label>
               <div
                 role="button"
                 tabIndex={0}
@@ -233,9 +233,9 @@ export default function EditInfoModal({
             <button
               onClick={handleSubmit}
               disabled={isLoading}
-              className="w-full rounded-xl bg-[#2ECC71] py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+              className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-400 disabled:opacity-60"
             >
-              {isLoading ? 'Guardando...' : 'Continue →'}
+              {isLoading ? 'Guardando...' : 'Continuar →'}
             </button>
 
             {/* Cancel Edit */}
@@ -243,7 +243,7 @@ export default function EditInfoModal({
               onClick={onClose}
               className="text-center text-sm text-[#8aa3ad] underline underline-offset-2 transition-colors hover:text-[#203D47]"
             >
-              Cancel Edit
+              Cancelar Edición
             </button>
           </div>
         </div>

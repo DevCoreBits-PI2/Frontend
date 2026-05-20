@@ -23,14 +23,14 @@ const WorkDetailsStep: React.FC<Props> = ({ data, onChange }) => {
       {/* Area / Department */}
       <div>
         <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-          Area / Department
+          Área / Departamento
         </label>
         <select
           value={data.areaId || ""}
           onChange={(e) => onChange({ areaId: e.target.value, positionId: "" })}
           className="w-full px-4 py-3 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71] text-gray-700"
         >
-          <option value="">Select Area</option>
+          <option value="">Seleccionar Área</option>
           {AREAS_MOCK.map((a) => (
             <option key={a.id} value={a.id}>
               {a.nombre}
@@ -42,14 +42,14 @@ const WorkDetailsStep: React.FC<Props> = ({ data, onChange }) => {
       {/* Position */}
       <div>
         <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-          Position
+          Posición
         </label>
         <select
           value={data.positionId || ""}
           onChange={(e) => onChange({ positionId: e.target.value })}
           className="w-full px-4 py-3 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71] text-gray-700"
         >
-          <option value="">Select Position</option>
+          <option value="">Seleccionar Posición</option>
           {positions.map((p: any) => (
             <option key={p.id} value={p.id}>
               {p.nombre}
@@ -61,7 +61,7 @@ const WorkDetailsStep: React.FC<Props> = ({ data, onChange }) => {
       {/* Hire Date */}
       <div>
         <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-          Hire Date
+          Fecha de Contratación
         </label>
         <input
           type="date"
@@ -74,14 +74,14 @@ const WorkDetailsStep: React.FC<Props> = ({ data, onChange }) => {
       {/* Contract Type */}
       <div>
         <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-          Contract Type
+          Tipo de Contrato
         </label>
         <select
           value={data.contractType || ""}
           onChange={(e) => onChange({ contractType: e.target.value })}
           className="w-full px-4 py-3 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71] text-gray-700"
         >
-          <option value="">Select Type</option>
+          <option value="">Seleccionar tipo</option>
           {CONTRACT_TYPES.map((c) => (
             <option key={c.id} value={c.id}>
               {c.nombre}

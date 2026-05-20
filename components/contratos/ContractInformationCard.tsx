@@ -22,9 +22,9 @@ function calcularDuracionDias(inicio: string, fin: string): number | null {
 }
 
 function formatDuracion(dias: number): string {
-  if (dias < 30) return `${dias} Days`;
+  if (dias < 30) return `${dias} Días`;
   const meses = Math.round(dias / 30);
-  return `${meses} Months (${dias} days)`;
+  return `${meses} Meses (${dias} días)`;
 }
 
 export default function ContractInformationCard({
@@ -38,7 +38,7 @@ export default function ContractInformationCard({
   const esIndefinido = tipo === "INDEFINIDO";
   const dias = !esIndefinido ? calcularDuracionDias(fechaInicio, fechaFin) : null;
 
-  const tituloCard = esIndefinido ? "Contract Details" : "Contract Information";
+  const tituloCard = esIndefinido ? "Detalles del Contrato" : "Información del Contrato";
 
   return (
     <section className="bg-white rounded-2xl border border-[#e8eef0] p-6">
@@ -50,14 +50,14 @@ export default function ContractInformationCard({
 
       {/* Tipo de contrato */}
       <div className="flex flex-col gap-1.5 mb-5">
-        <label className="text-xs font-medium text-[#0F1819]">Contract Type</label>
+        <label className="text-xs font-medium text-[#0F1819]">Tipo de Contrato</label>
         <ContractTypeSelect valor={tipo} onChange={onTipoChange} />
       </div>
 
       {/* Fechas */}
       <div className="grid grid-cols-2 gap-4 mb-5">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-[#0F1819]">Start Date</label>
+          <label className="text-xs font-medium text-[#0F1819]">Fecha de Inicio</label>
           <div className="relative">
             <Calendar
               size={14}
@@ -73,7 +73,7 @@ export default function ContractInformationCard({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-[#0F1819]">End Date</label>
+          <label className="text-xs font-medium text-[#0F1819]">Fecha de Fin</label>
           {esIndefinido ? (
             <>
               <div className="relative">
@@ -90,7 +90,7 @@ export default function ContractInformationCard({
                 />
               </div>
               <span className="text-[11px] text-[#8aa3ad]">
-                Not applicable for indefinite term contracts.
+                No aplica para contratos de término indefinido.
               </span>
             </>
           ) : (
@@ -116,10 +116,10 @@ export default function ContractInformationCard({
           <InfinityIcon size={20} className="text-emerald-500 shrink-0" />
           <div className="flex flex-col">
             <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">
-              Calculated Duration
+              Duración Calculada
             </span>
             <span className="text-sm font-semibold text-[#0F1819]">
-              Duration: Indefinite — No expiration date
+              Duración: Indefinida — Sin fecha de vencimiento
             </span>
           </div>
         </div>
@@ -127,7 +127,7 @@ export default function ContractInformationCard({
         <div className="flex items-center justify-between bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
           <div className="flex items-center gap-2.5">
             <Clock4 size={16} className="text-emerald-500" />
-            <span className="text-sm font-semibold text-[#0F1819]">Calculated Duration</span>
+            <span className="text-sm font-semibold text-[#0F1819]">Duración Calculada</span>
           </div>
           <span className="text-sm font-bold text-[#0F1819]">
             {dias !== null ? formatDuracion(dias) : "—"}

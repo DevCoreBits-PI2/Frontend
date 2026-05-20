@@ -34,7 +34,7 @@ export default function HierarchyModal({
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-[#0F1819]">
-            {mode === "add" ? "Add Hierarchy" : "Edit Hierarchy"}
+            {mode === "add" ? "Agregar Jerarquía" : "Editar Jerarquía"}
           </h2>
           <button
             onClick={onClose}
@@ -48,7 +48,7 @@ export default function HierarchyModal({
           {/* Superior Position — read only */}
           <div>
             <label className="text-sm font-semibold text-[#0F1819] block mb-1.5">
-              Superior Position
+              Posición Superior
             </label>
             <div className="w-full border border-[#d1dde2] rounded-xl px-3 py-2.5 text-sm text-[#8aa3ad] bg-[#f9fafb]">
               {superiorPosition}
@@ -58,7 +58,7 @@ export default function HierarchyModal({
           {/* Actual Position — editable */}
           <div>
             <label className="text-sm font-semibold text-[#0F1819] block mb-1.5">
-              Actual Position
+              Posición Actual
             </label>
             <div className="relative">
               <input
@@ -66,7 +66,7 @@ export default function HierarchyModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && onConfirm(name.trim())}
-                placeholder="Enter position name"
+                placeholder="Ingresa el nombre de la posición"
                 autoFocus
                 className="w-full border border-[#d1dde2] rounded-xl px-3 py-2.5 text-sm text-[#0F1819] focus:outline-none focus:ring-2 focus:ring-emerald-400 pr-8 transition-colors hover:border-[#b0c4cc]"
               />
@@ -81,7 +81,7 @@ export default function HierarchyModal({
           {subordinates.length > 0 && (
             <div>
               <p className="text-sm font-semibold text-[#0F1819] text-center mb-3">
-                Subordinates
+                Subordinados
               </p>
               <div className="grid grid-cols-2 gap-3">
                 {subordinates.slice(0, 4).map((sub, i) => (
@@ -103,13 +103,13 @@ export default function HierarchyModal({
             onClick={onClose}
             className="px-5 py-2.5 text-sm font-semibold text-[#4a7880] hover:text-[#0F1819] transition-colors"
           >
-            Cancel
+            Cancelar
           </button>
           <button
             onClick={() => onConfirm(name.trim())}
             className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold rounded-xl transition-colors"
           >
-            Continue
+            Continuar
           </button>
         </div>
       </div>

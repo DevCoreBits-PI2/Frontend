@@ -17,7 +17,7 @@ interface Competency {
 
 function EvalRadarChart({ scores }: { scores: number[] }) {
   const cx = 110, cy = 110, R = 78;
-  const labels = ["COMM", "TECH", "LEAD", "INNO", "RELI"];
+  const labels = ["COMUN", "TÉCN", "LIDER", "INNOV", "CONFI"];
   const values  = scores.map((s) => s / 5);
 
   const angle = (i: number) => ((90 - i * 72) * Math.PI) / 180;
@@ -104,25 +104,25 @@ function ScoreSlider({ competency, onChange }: { competency: Competency; onChang
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
 const INITIAL_COMPETENCIES: Competency[] = [
-  { id: "comm", label: "Communication",         score: 3.8 },
-  { id: "tech", label: "Technical Proficiency",  score: 4.5 },
-  { id: "lead", label: "Leadership & Influence", score: 3.2 },
-  { id: "inno", label: "Innovation",             score: 4.1 },
-  { id: "reli", label: "Reliability",            score: 4.7 },
+  { id: "comm", label: "Comunicación",          score: 3.8 },
+  { id: "tech", label: "Competencia Técnica",   score: 4.5 },
+  { id: "lead", label: "Liderazgo e Influencia",score: 3.2 },
+  { id: "inno", label: "Innovación",            score: 4.1 },
+  { id: "reli", label: "Confiabilidad",         score: 4.7 },
 ];
 
 const HISTORY = [
-  { label: "Annual Review", date: "Dec 2023", score: 4.2, sparkline: [3.8, 4.0, 4.1, 4.2] },
-  { label: "Q4 Feedback",   date: "Oct 2023", score: 3.9, sparkline: [3.6, 3.7, 3.9, 3.9] },
-  { label: "Q3 Check-in",   date: "Jul 2023", score: 3.7, sparkline: [3.5, 3.6, 3.7, 3.7] },
+  { label: "Revisión Anual", date: "Dic 2023", score: 4.2, sparkline: [3.8, 4.0, 4.1, 4.2] },
+  { label: "Feedback Q4",    date: "Oct 2023", score: 3.9, sparkline: [3.6, 3.7, 3.9, 3.9] },
+  { label: "Revisión Q3",    date: "Jul 2023", score: 3.7, sparkline: [3.5, 3.6, 3.7, 3.7] },
 ];
 
 const RECOMMENDATIONS = [
-  "Retention & Skill Enhancement",
-  "Performance Improvement Plan",
-  "Leadership Development",
-  "Promotion Candidate",
-  "Lateral Transition",
+  "Retención y Mejora de Habilidades",
+  "Plan de Mejora de Desempeño",
+  "Desarrollo de Liderazgo",
+  "Candidato a Promoción",
+  "Transición Lateral",
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -169,20 +169,20 @@ export default function EvaluacionEmpleadoPage() {
         {/* Header */}
         <header className="flex items-center px-6 py-3.5 bg-white border-b border-[#d1dde2] shrink-0">
           <nav className="flex items-center gap-1.5 text-xs text-[#8aa3ad]">
-            <span className="hover:text-[#203D47] cursor-pointer transition-colors">Dashboard</span>
+            <span className="hover:text-[#203D47] cursor-pointer transition-colors">Panel</span>
             <ChevronRight size={12} className="text-[#c5d5db]" />
             <span
               onClick={() => router.push("/dashboard/empleados")}
               className="hover:text-[#203D47] cursor-pointer transition-colors"
             >
-              Employee Directory
+              Directorio de Empleados
             </span>
             <ChevronRight size={12} className="text-[#c5d5db]" />
             <span className="text-[#0F1819] font-semibold">
               {cargando ? "Cargando..." : `${empleado?.nombre} ${empleado?.apellidos}`}
             </span>
             <ChevronRight size={12} className="text-[#c5d5db]" />
-            <span className="text-[#0F1819] font-semibold">Create Evaluation</span>
+            <span className="text-[#0F1819] font-semibold">Crear Evaluación</span>
           </nav>
         </header>
 
@@ -201,12 +201,12 @@ export default function EvaluacionEmpleadoPage() {
                 {/* Evaluation Context */}
                 <section>
                   <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad] mb-4">
-                    Evaluation Context
+                    Contexto de Evaluación
                   </h2>
                   <div className="grid grid-cols-2 gap-4">
                     {/* Employee (pre-filled, read-only) */}
                     <div>
-                      <label className="text-xs font-medium text-[#8aa3ad] mb-1.5 block">Employee</label>
+                      <label className="text-xs font-medium text-[#8aa3ad] mb-1.5 block">Empleado</label>
                       <div className="flex items-center gap-2.5 border border-[#d1dde2] rounded-xl px-3 py-2.5 bg-[#fafcfc]">
                         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#203D47] to-[#0F1819] flex items-center justify-center text-white text-[10px] font-bold shrink-0">
                           {iniciales}
@@ -225,7 +225,7 @@ export default function EvaluacionEmpleadoPage() {
 
                     {/* Period */}
                     <div>
-                      <label className="text-xs font-medium text-[#8aa3ad] mb-1.5 block">Evaluation Period</label>
+                      <label className="text-xs font-medium text-[#8aa3ad] mb-1.5 block">Período de Evaluación</label>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="relative">
                           <select
@@ -253,7 +253,7 @@ export default function EvaluacionEmpleadoPage() {
                 {/* Competency Scoring */}
                 <section>
                   <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad] mb-4">
-                    Competency Scoring
+                    Puntuación de Competencias
                   </h2>
                   <div className="space-y-5">
                     {competencies.map((c) => (
@@ -265,12 +265,12 @@ export default function EvaluacionEmpleadoPage() {
                 {/* Evaluation Summary */}
                 <section>
                   <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad] mb-4">
-                    Evaluation Summary
+                    Resumen de Evaluación
                   </h2>
                   <div className="space-y-4">
                     <div>
                       <label className="text-xs font-medium text-[#8aa3ad] mb-1.5 block">
-                        Strategic Recommendation
+                        Recomendación Estratégica
                       </label>
                       <div className="relative">
                         <select
@@ -285,13 +285,13 @@ export default function EvaluacionEmpleadoPage() {
                     </div>
                     <div>
                       <label className="text-xs font-medium text-[#8aa3ad] mb-1.5 block">
-                        Qualitative Observations
+                        Observaciones Cualitativas
                       </label>
                       <textarea
                         value={observations}
                         onChange={(e) => setObservations(e.target.value)}
                         rows={4}
-                        placeholder="Provide detailed feedback on performance metrics and cultural alignment..."
+                        placeholder="Proporciona retroalimentación detallada sobre métricas de desempeño y alineación cultural..."
                         className="w-full border border-[#d1dde2] rounded-xl px-3 py-2.5 text-sm text-[#0F1819] placeholder:text-[#c5d5db] focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none bg-[#fafcfc]"
                       />
                     </div>
@@ -305,11 +305,11 @@ export default function EvaluacionEmpleadoPage() {
                 <div className="bg-white rounded-2xl shadow-sm p-5">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h3 className="text-sm font-bold text-[#0F1819]">Performance Profile</h3>
-                      <p className="text-[10px] text-[#8aa3ad] mt-0.5">Metric distribution vs. Benchmark</p>
+                      <h3 className="text-sm font-bold text-[#0F1819]">Perfil de Desempeño</h3>
+                      <p className="text-[10px] text-[#8aa3ad] mt-0.5">Distribución de métricas vs. referencia</p>
                     </div>
                     <span className="text-[9px] font-bold uppercase tracking-widest border border-emerald-200 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded shrink-0">
-                      Live Preview
+                      Vista en Vivo
                     </span>
                   </div>
 
@@ -317,7 +317,7 @@ export default function EvaluacionEmpleadoPage() {
 
                   <div className="flex items-end justify-between mt-2 pt-3 border-t border-[#f0f4f5]">
                     <div>
-                      <p className="text-[9px] uppercase tracking-widest text-[#8aa3ad] font-bold">Composite Score</p>
+                      <p className="text-[9px] uppercase tracking-widest text-[#8aa3ad] font-bold">Puntuación Compuesta</p>
                       <div className="flex items-end gap-1 mt-1">
                         <span className="text-3xl font-extrabold text-[#0F1819] leading-none">{compositeScore}</span>
                         <span className="text-sm text-[#8aa3ad] mb-0.5">/5.0</span>
@@ -325,14 +325,14 @@ export default function EvaluacionEmpleadoPage() {
                     </div>
                     <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-lg px-2.5 py-1.5">
                       <TrendingUp size={11} />
-                      <span className="text-[10px] font-bold">+12% vs LY</span>
+                      <span className="text-[10px] font-bold">+12% vs Año Ant.</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Evaluation History */}
                 <div className="bg-white rounded-2xl shadow-sm p-5">
-                  <h3 className="text-sm font-bold text-[#0F1819] mb-4">Evaluation History</h3>
+                  <h3 className="text-sm font-bold text-[#0F1819] mb-4">Historial de Evaluaciones</h3>
                   <div className="space-y-3">
                     {HISTORY.map((h) => (
                       <div key={h.label} className="flex items-center gap-2">
@@ -348,7 +348,7 @@ export default function EvaluacionEmpleadoPage() {
                     ))}
                   </div>
                   <button className="mt-4 w-full text-center text-[9px] font-bold uppercase tracking-widest text-[#8aa3ad] hover:text-[#203D47] transition-colors pt-3 border-t border-[#f0f4f5]">
-                    View Detailed Archive
+                    Ver Archivo Detallado
                   </button>
                 </div>
               </div>
@@ -362,11 +362,11 @@ export default function EvaluacionEmpleadoPage() {
             onClick={() => router.back()}
             className="text-sm text-[#8aa3ad] hover:text-[#203D47] transition-colors"
           >
-            Cancel
+            Cancelar
           </button>
           <div className="flex items-center gap-3">
             <button className="px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#d1dde2] text-[#203D47] hover:bg-gray-50 transition-colors">
-              Save Draft
+              Guardar Borrador
             </button>
             <button
               onClick={async () => {
@@ -374,8 +374,8 @@ export default function EvaluacionEmpleadoPage() {
                 // Construir payload de evaluación
                 const evalObj: Evaluation = {
                   id: `${Date.now()}`,
-                  title: `${period} Review`,
-                  reviewer: "Current User",
+                  title: `Revisión ${period}`,
+                  reviewer: "Usuario Actual",
                   date: new Date().toLocaleDateString(),
                   score: parseFloat(compositeScore),
                   isRecent: true,
@@ -393,7 +393,7 @@ export default function EvaluacionEmpleadoPage() {
               }}
               className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500 text-white hover:bg-emerald-400 transition-colors"
             >
-              Confirm Evaluation
+              Confirmar Evaluación
             </button>
           </div>
         </div>

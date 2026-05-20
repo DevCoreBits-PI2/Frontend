@@ -72,14 +72,14 @@ function StatusBadge({ status }: StatusBadgeProps) {
   if (status === "Active") {
     return (
       <span className="px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-300">
-        Active
+        Activa
       </span>
     );
   }
 
   return (
     <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-300">
-      Drafting
+      Borrador
     </span>
   );
 }
@@ -228,8 +228,8 @@ function NewPositionModal({
                 onChange={(e) => setEstado(e.target.value as "Active" | "Drafting")}
                 className="w-full px-3 py-2 border border-[#BDD5EA] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-[#0F1819]"
               >
-                <option value="Active">Active</option>
-                <option value="Drafting">Drafting</option>
+                <option value="Active">Activa</option>
+                <option value="Drafting">Borrador</option>
               </select>
             </div>
           </div>
@@ -360,7 +360,7 @@ return (
       <div className="bg-white border-b border-[#BDD5EA]">
         <div className="px-6 py-4">
           <div className="flex items-center gap-2 text-sm text-[#8aa3ad] mb-4">
-            <span>Dashboard</span>
+            <span>Panel</span>
             <ChevronRight className="w-4 h-4" />
             <span>Áreas</span>
             <ChevronRight className="w-4 h-4" />

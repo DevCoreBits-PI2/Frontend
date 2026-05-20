@@ -7,9 +7,9 @@ interface Props {
 
 const StepIndicator: React.FC<Props> = ({ step }) => {
   const steps = [
-    { n: 1, label: "Personal Data" },
-    { n: 2, label: "Work Details" },
-    { n: 3, label: "Review & Confirm" },
+    { n: 1, label: "Datos Personales" },
+    { n: 2, label: "Detalles Laborales" },
+    { n: 3, label: "Revisar y Confirmar" },
   ];
 
   return (

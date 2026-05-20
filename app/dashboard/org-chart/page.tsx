@@ -12,7 +12,7 @@ import ErrorModal from "@/components/org-chart/ErrorModal";
 import DetachConfirmModal from "@/components/org-chart/DetachConfirmModal";
 import { ChevronRight, ChevronDown, Filter, Clock, Save } from "lucide-react";
 
-const DEPARTMENTS = ["Department of Engineering", "Department of Marketing", "Department of Operations"];
+const DEPARTMENTS = ["Departamento de Ingeniería", "Departamento de Marketing", "Departamento de Operaciones"];
 
 // Toast helpers
 function toastSuccess() {
@@ -27,8 +27,8 @@ function toastSuccess() {
           <Check size={15} className="text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[#0F1819] font-bold text-sm">successful hierarchy</p>
-          <p className="text-[#8aa3ad] text-xs mt-0.5">the new hierarchy was implemented</p>
+          <p className="text-[#0F1819] font-bold text-sm">Jerarquía exitosa</p>
+          <p className="text-[#8aa3ad] text-xs mt-0.5">La nueva jerarquía fue implementada</p>
         </div>
         <button
           onClick={() => toast.dismiss(t.id)}
@@ -50,7 +50,7 @@ function toastDetached() {
           t.visible ? "opacity-100" : "opacity-0"
         }`}
       >
-        <span className="text-sm font-semibold">Hierarchical relationship removed</span>
+        <span className="text-sm font-semibold">Relación jerárquica eliminada</span>
         <button
           onClick={() => toast.dismiss(t.id)}
           className="text-white/80 hover:text-white transition-colors shrink-0"
@@ -72,7 +72,7 @@ export default function PositionHierarchyPage() {
   const [department, setDepartment] = useState(DEPARTMENTS[0]);
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
   const [scale, setScale] = useState(0.9);
-  const [lastSaved, setLastSaved] = useState("Today at 10:42 AM");
+  const [lastSaved, setLastSaved] = useState("Hoy a las 10:42");
 
   // Editable panel state (lifted up so Save/Discard can control)
   const [editSuperior, setEditSuperior] = useState("");
@@ -94,7 +94,7 @@ export default function PositionHierarchyPage() {
         setAllPositions(positions);
         setTree(buildPositionTree(positions));
       })
-      .catch(() => setError("Could not load the hierarchy."))
+      .catch(() => setError("No se pudo cargar la jerarquía."))
       .finally(() => setLoading(false));
   }, []);
 
@@ -142,11 +142,10 @@ export default function PositionHierarchyPage() {
       setSelected(updatedPos);
     }
     const now = new Date();
-    const h = now.getHours();
+    const h = now.getHours().toString().padStart(2, "0");
     const m = now.getMinutes().toString().padStart(2, "0");
-    const ampm = h >= 12 ? "PM" : "AM";
-    setLastSaved(`Today at ${h % 12 || 12}:${m} ${ampm}`);
-    toast.success("Changes saved successfully", {
+    setLastSaved(`Hoy a las ${h}:${m}`);
+    toast.success("Cambios guardados con éxito", {
       duration: 3500,
       style: {
         background: "#0F1819",
@@ -171,7 +170,7 @@ export default function PositionHierarchyPage() {
     if (!newName) {
       setErrorInfo({
         message:
-          "Position name cannot be empty. Please enter a valid name for the new position.",
+          "El nombre de la posición no puede estar vacío. Por favor ingresa un nombre válido para la nueva posición.",
         returnTo: "add",
         ctx: addParent,
       });
@@ -183,7 +182,7 @@ export default function PositionHierarchyPage() {
       allPositions.some((p) => p.name.toLowerCase() === newName.toLowerCase())
     ) {
       setErrorInfo({
-        message: `The established hierarchy cannot be applied, as a position named "${newName}" already exists. Please edit the configuration to create a coherent relationship.`,
+        message: `No se puede aplicar la jerarquía establecida, ya que existe una posición llamada "${newName}". Por favor edita la configuración para crear una relación coherente.`,
         returnTo: "add",
         ctx: addParent,
       });
@@ -221,7 +220,7 @@ export default function PositionHierarchyPage() {
 
     if (!newName) {
       setErrorInfo({
-        message: "Position name cannot be empty. Please enter a valid name.",
+        message: "El nombre de la posición no puede estar vacío. Por favor ingresa un nombre válido.",
         returnTo: "edit",
         ctx: editPos,
       });
@@ -234,7 +233,7 @@ export default function PositionHierarchyPage() {
     );
     if (conflict) {
       setErrorInfo({
-        message: `The established hierarchy cannot be applied, as the "${newName}" position cannot be placed above itself, nor can it receive reports from itself. Please edit the configuration to create a coherent relationship.`,
+        message: `No se puede aplicar la jerarquía establecida, ya que la posición "${newName}" no puede ubicarse sobre sí misma, ni recibir reportes de sí misma. Por favor edita la configuración para crear una relación coherente.`,
         returnTo: "edit",
         ctx: editPos,
       });
@@ -249,7 +248,7 @@ export default function PositionHierarchyPage() {
     setTree(buildPositionTree(updated));
     if (selected?.id === editPos.id) setSelected((prev) => prev ? { ...prev, name: newName } : null);
     setEditPos(null);
-    toast.success("Position updated", {
+    toast.success("Posición actualizada", {
       style: { background: "#0F1819", color: "#fff", borderRadius: "12px", border: "1px solid #203D47" },
       iconTheme: { primary: "#34d399", secondary: "#0F1819" },
     });
@@ -308,22 +307,22 @@ export default function PositionHierarchyPage() {
       {/* Breadcrumb */}
       <header className="flex items-center px-6 py-3.5 bg-white border-b border-[#d1dde2] shrink-0">
         <nav className="flex items-center gap-1.5 text-xs text-[#8aa3ad]">
-          <span className="hover:text-[#203D47] cursor-pointer transition-colors">Dashboard</span>
+          <span className="hover:text-[#203D47] cursor-pointer transition-colors">Panel</span>
           <ChevronRight size={12} className="text-[#c5d5db]" />
-          <span className="hover:text-[#203D47] cursor-pointer transition-colors">Organizational Structure</span>
+          <span className="hover:text-[#203D47] cursor-pointer transition-colors">Estructura Organizacional</span>
           <ChevronRight size={12} className="text-[#c5d5db]" />
-          <span className="hover:text-[#203D47] cursor-pointer transition-colors">Positions</span>
+          <span className="hover:text-[#203D47] cursor-pointer transition-colors">Posiciones</span>
           <ChevronRight size={12} className="text-[#c5d5db]" />
-          <span className="text-[#0F1819] font-semibold">Hierarchy</span>
+          <span className="text-[#0F1819] font-semibold">Jerarquía</span>
         </nav>
       </header>
 
       {/* Contenido */}
       <main className="flex-1 px-6 py-5 flex flex-col gap-4 overflow-hidden">
         <div>
-          <h1 className="text-xl font-bold text-[#0F1819]">Position Hierarchy</h1>
+          <h1 className="text-xl font-bold text-[#0F1819]">Jerarquía de Posiciones</h1>
           <p className="text-sm text-[#8aa3ad] mt-0.5">
-            Define and manage reporting relationships and organizational structure across your departments.
+            Define y administra las relaciones de reporte y la estructura organizacional entre tus departamentos.
           </p>
         </div>
 
@@ -358,7 +357,7 @@ export default function PositionHierarchyPage() {
           </div>
           <button className="flex items-center gap-2 border border-[#d1dde2] bg-white text-[#4a7880] text-sm font-medium px-4 py-2.5 rounded-xl hover:border-[#b0c4cc] hover:bg-[#f4f7f8] transition-colors">
             <Filter size={14} />
-            Advanced Filters
+            Filtros Avanzados
           </button>
         </div>
 
@@ -368,7 +367,7 @@ export default function PositionHierarchyPage() {
             <div className="flex-1 flex items-center justify-center">
               <div className="flex flex-col items-center gap-3">
                 <div className="w-8 h-8 rounded-full border-2 border-[#203D47] border-t-emerald-400 animate-spin" />
-                <span className="text-xs text-[#8aa3ad]">Loading hierarchy…</span>
+                <span className="text-xs text-[#8aa3ad]">Cargando jerarquía…</span>
               </div>
             </div>
           )}
@@ -414,21 +413,21 @@ export default function PositionHierarchyPage() {
       >
         <div className="flex items-center gap-2 text-xs text-[#8aa3ad]">
           <Clock size={13} />
-          <span>Last saved: {lastSaved}</span>
+          <span>Último guardado: {lastSaved}</span>
         </div>
         <div className="flex items-center gap-2.5">
           <button
             onClick={handleDiscard}
             className="px-5 py-2.5 border border-[#d1dde2] text-[#4a7880] text-sm font-semibold rounded-xl hover:border-[#b0c4cc] hover:bg-[#f4f7f8] transition-colors"
           >
-            Discard Changes
+            Descartar Cambios
           </button>
           <button
             onClick={handleSave}
             className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
           >
             <Save size={14} />
-            Save Changes
+            Guardar Cambios
           </button>
         </div>
       </footer>

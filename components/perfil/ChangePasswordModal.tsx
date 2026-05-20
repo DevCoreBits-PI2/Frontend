@@ -218,7 +218,7 @@ export default function ChangePasswordModal({ isOpen, onClose, onSave }: ChangeP
                 type="button"
                 onClick={handleSubmit}
                 disabled={isLoading}
-                className="rounded-lg bg-[#0F1819] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#203D47] disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isLoading ? 'Actualizando...' : 'Actualizar contraseña'}
               </button>

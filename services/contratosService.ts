@@ -71,6 +71,54 @@ const CONTRATOS_MOCK: Contrato[] = [
     validez: "VOIDED",
     creadoEn: "2019-10-01",
   },
+  {
+    id: "c-005",
+    idEmpleado: "9284",
+    tipo: "INDEFINIDO",
+    fechaInicio: "2023-03-01",
+    fechaFin: null,
+    salarioBase: 88000,
+    notas: "Contrato senior con beneficios extendidos.",
+    estado: "ACTIVO",
+    validez: "ONGOING",
+    creadoEn: "2023-03-01",
+  },
+  {
+    id: "c-006",
+    idEmpleado: "1024",
+    tipo: "FIJO",
+    fechaInicio: "2024-01-10",
+    fechaFin: "2025-01-09",
+    salarioBase: 72000,
+    notas: "Contrato a término fijo - marketing.",
+    estado: "ACTIVO",
+    validez: "ONGOING",
+    creadoEn: "2024-01-10",
+  },
+  {
+    id: "c-007",
+    idEmpleado: "2031",
+    tipo: "TIEMPO_PARCIAL",
+    fechaInicio: "2023-09-15",
+    fechaFin: "2024-09-14",
+    salarioBase: 38000,
+    notas: "Contrato tiempo parcial RRHH.",
+    estado: "ACTIVO",
+    validez: "ONGOING",
+    creadoEn: "2023-09-15",
+  },
+  {
+    id: "c-008",
+    idEmpleado: "3098",
+    tipo: "FIJO",
+    fechaInicio: "2022-06-01",
+    fechaFin: "2023-05-31",
+    salarioBase: 65000,
+    notas: "Contrato fijo expirado, análisis financiero.",
+    estado: "EXPIRADO",
+    validez: "EXPIRED",
+    creadoEn: "2022-06-01",
+  },
 ];
 
 export interface NuevoContratoDTO {
@@ -88,6 +136,11 @@ export const obtenerContratosPorEmpleado = async (
 ): Promise<Contrato[]> => {
   await new Promise((resolve) => setTimeout(resolve, 300));
   return CONTRATOS_MOCK.filter((c) => c.idEmpleado === idEmpleado);
+};
+
+export const obtenerTodosLosContratos = async (): Promise<Contrato[]> => {
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  return [...CONTRATOS_MOCK];
 };
 
 export const crearContrato = async (

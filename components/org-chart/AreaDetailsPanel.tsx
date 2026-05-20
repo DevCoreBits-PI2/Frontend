@@ -60,7 +60,7 @@ export default function PositionDetailPanel({
             <div>
               <p className="text-[#0F1819] font-bold text-base leading-tight">{position.name}</p>
               <p className="text-[#8aa3ad] text-xs mt-0.5">
-                {position.department} • Level {position.level} Position
+                {position.department} • Posición Nivel {position.level}
               </p>
             </div>
           </div>
@@ -68,7 +68,7 @@ export default function PositionDetailPanel({
           {/* Close button */}
           <button
             onClick={onClose}
-            title="Close panel"
+            title="Cerrar panel"
             className="p-1.5 text-[#8aa3ad] hover:text-[#0F1819] hover:bg-[#f4f7f8] rounded-lg transition-colors shrink-0 mt-0.5"
           >
             <X size={15} />
@@ -80,7 +80,7 @@ export default function PositionDetailPanel({
         {/* Superior Position */}
         <div>
           <span className="text-[10px] font-bold tracking-widest uppercase text-[#8aa3ad] block mb-2">
-            Superior Position
+            Posición Superior
           </span>
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -102,22 +102,22 @@ export default function PositionDetailPanel({
               />
             </div>
             <button
-              title="Swap position"
+              title="Intercambiar posición"
               className="p-2.5 border border-[#d1dde2] rounded-xl text-[#8aa3ad] hover:text-[#0F1819] hover:border-[#b0c4cc] transition-colors"
             >
               <ArrowUpDown size={14} />
             </button>
           </div>
           <p className="text-[11px] text-[#8aa3ad] leading-relaxed mt-2">
-            Changing the superior position will automatically move all direct reports of{" "}
-            <span className="text-[#4a7880] font-medium">{position.name}</span> under the new structure.
+            Cambiar la posición superior moverá automáticamente todos los reportes directos de{" "}
+            <span className="text-[#4a7880] font-medium">{position.name}</span> bajo la nueva estructura.
           </p>
         </div>
 
         {/* Direct Reports */}
         <div>
           <span className="text-[10px] font-bold tracking-widest uppercase text-[#8aa3ad] block mb-2">
-            Direct Reports ({reports.length})
+            Reportes Directos ({reports.length})
           </span>
           <div className="flex flex-wrap gap-2">
             {reports.map((name) => (
@@ -137,25 +137,24 @@ export default function PositionDetailPanel({
           </div>
           <button className="flex items-center gap-1 text-emerald-600 hover:text-emerald-500 text-xs font-semibold mt-2.5 transition-colors">
             <Plus size={12} />
-            Add Report
+            Agregar Reporte
           </button>
         </div>
 
         {/* Remove Hierarchy */}
         <div className="pt-1">
           <span className="text-sm font-semibold text-[#0F1819] block mb-1.5">
-            Remove Hierarchy
+            Eliminar Jerarquía
           </span>
           <p className="text-[11px] text-[#8aa3ad] leading-relaxed mb-3">
-            Detaching this position from the hierarchy will make it an unassigned node. All children
-            will also lose their reporting lineage.
+            Desvincular esta posición de la jerarquía la convertirá en un nodo sin asignar. Todos los hijos también perderán su línea de reporte.
           </p>
           <button
             onClick={onDetach}
             className="w-full flex items-center justify-center gap-2 border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm font-semibold py-2.5 rounded-xl transition-colors"
           >
             <Link2Off size={14} />
-            Detach from Hierarchy
+            Desvincular de Jerarquía
           </button>
         </div>
       </div>

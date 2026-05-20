@@ -45,7 +45,7 @@ function StatusToggle({ estado }: { estado: EstadoEmpleado }) {
 
   return (
     <div className="flex items-center gap-2.5">
-      <span className="text-xs font-medium text-[#8aa3ad]">Status</span>
+      <span className="text-xs font-medium text-[#8aa3ad]">Estado</span>
       <div className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${config.trackColor}`}>
         <span
           className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${config.thumbPosition}`}
@@ -155,7 +155,7 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                   </span>
                   <span className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    Joined Feb 2019
+                    Ingresó Feb 2019
                   </span>
                   <span className="flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
@@ -246,7 +246,7 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-400 rounded-lg transition-colors"
                   >
                     <Plus size={13} />
-                    Register Work Change
+                    Registrar Cambio Laboral
                   </button>
                 </div>
                 <div className="space-y-8">
@@ -254,7 +254,7 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                     {
                       fecha: "ENE 2024",
                       titulo: "Ascenso a Arquitecto Senior",
-                      area: "ENGINEERING HUB",
+                      area: "CENTRO DE INGENIERÍA",
                       descripcion:
                         "Transición a rol de liderazgo supervisando proyectos de modernización de infraestructura cloud en regiones de Norteamérica.",
                       icon: "●",
@@ -270,7 +270,7 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                     {
                       fecha: "MAR 2019",
                       titulo: "Ingreso como Desarrollador Junior",
-                      area: "CORE PLATFORMS",
+                      area: "PLATAFORMAS CORE",
                       descripcion:
                         "Incorporación al programa de desarrollo para graduados enfocado en mantenimiento de sistemas legados.",
                       icon: "■",
@@ -350,7 +350,7 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
               <div className="space-y-5 text-sm">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">Email</p>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">Correo</p>
                         <p className="break-words text-xs font-medium text-[#0F1819]">{emailLocal}</p>
                   </div>
                   <div>
@@ -394,6 +394,9 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
         onGuardar={async (_datos) => {
           setModalCambioAbierto(false);
           setToastVisible(true);
+        }}
+      />
+
       {/* Edit Info Modal */}
       <EditInfoModal
         isOpen={modalEditarAbierto}

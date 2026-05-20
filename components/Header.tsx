@@ -29,7 +29,7 @@ export default function Header({ user }: HeaderProps) {
       {/* Breadcrumb */}
       <nav className="text-sm text-gray-600 flex items-center gap-2">
         <Link href="/" className="hover:underline text-gray-500">
-          Home
+          Inicio
         </Link>
 
         {segments.map((segment, index) => {
