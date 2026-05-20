@@ -24,8 +24,8 @@ export default function PaginaContratosEmpleado() {
   // El toast se inicializa en el primer render leyendo la query string,
   // y un efecto separado limpia la URL (sin re-renders en cascada).
   const [toast, setToast] = useState<string | null>(() => {
-    if (searchParams.get("creado") === "1") return "Contract created successfully.";
-    if (searchParams.get("actualizado") === "1") return "Contract updated successfully.";
+    if (searchParams.get("creado") === "1") return "Contrato creado con éxito.";
+    if (searchParams.get("actualizado") === "1") return "Contrato actualizado con éxito.";
     return null;
   });
 
@@ -86,17 +86,17 @@ export default function PaginaContratosEmpleado() {
             href="/dashboard"
             className="hover:text-[#203D47] cursor-pointer transition-colors"
           >
-            Dashboard
+            Panel
           </Link>
           <ChevronRight size={12} className="text-[#c5d5db]" />
           <Link
             href="/dashboard/empleados"
             className="hover:text-[#203D47] cursor-pointer transition-colors"
           >
-            Employee Directory
+            Directorio de Empleados
           </Link>
           <ChevronRight size={12} className="text-[#c5d5db]" />
-          <span className="text-[#0F1819] font-semibold">Contracts</span>
+          <span className="text-[#0F1819] font-semibold">Contratos</span>
         </nav>
       </header>
 
@@ -132,7 +132,7 @@ export default function PaginaContratosEmpleado() {
                     {empleado.nombre} {empleado.apellidos}
                   </h1>
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600">
-                    Active
+                    Activo
                   </span>
                 </div>
                 <p className="text-sm text-[#576975]">
@@ -146,8 +146,8 @@ export default function PaginaContratosEmpleado() {
 
             <div className="mb-6 flex items-center justify-between border-b border-[#e8eef0] pb-4">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#8aa3ad]">Section</p>
-                <h2 className="text-base font-semibold text-[#0F1819]">Contracts</h2>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#8aa3ad]">Sección</p>
+                <h2 className="text-base font-semibold text-[#0F1819]">Contratos</h2>
               </div>
             </div>
 
@@ -156,7 +156,7 @@ export default function PaginaContratosEmpleado() {
               <div className="flex items-end gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-[#8aa3ad]">
-                    Status
+                    Estado
                   </label>
                   <select
                     value={filtroEstado}
@@ -168,24 +168,24 @@ export default function PaginaContratosEmpleado() {
                     }}
                     className="bg-white border border-[#d1dde2] rounded-lg px-3 py-2 text-sm text-[#0F1819] focus:outline-none focus:ring-2 focus:ring-emerald-400 min-w-[160px]"
                   >
-                    <option value="ALL">All Statuses</option>
-                    <option value="ACTIVO">Active</option>
-                    <option value="RENOVADO">Renewed</option>
-                    <option value="EXPIRADO">Expired</option>
-                    <option value="ANULADO">Voided</option>
+                    <option value="ALL">Todos los estados</option>
+                    <option value="ACTIVO">Activo</option>
+                    <option value="RENOVADO">Renovado</option>
+                    <option value="EXPIRADO">Expirado</option>
+                    <option value="ANULADO">Anulado</option>
                   </select>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-[#8aa3ad]">
-                    Date Range
+                    Rango de Fechas
                   </label>
                   <button
                     type="button"
                     className="flex items-center gap-2 bg-white border border-[#d1dde2] rounded-lg px-3 py-2 text-sm text-[#8aa3ad] min-w-[180px] hover:border-[#a7b5be] transition-colors"
                   >
                     <Calendar size={14} />
-                    Select dates
+                    Seleccionar fechas
                   </button>
                 </div>
               </div>
@@ -196,14 +196,14 @@ export default function PaginaContratosEmpleado() {
                   className="flex items-center gap-2 px-3.5 py-2.5 text-sm text-[#203D47] border border-[#d1dde2] rounded-xl hover:bg-[#ECEFF1] transition-colors"
                 >
                   <Download size={14} />
-                  Export History
+                  Exportar Historial
                 </button>
                 <Link
                   href={`/dashboard/empleados/${empleadoId}/contratos/registrar`}
                   className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shrink-0"
                 >
                   <Plus size={15} />
-                  Register Contract
+                  Registrar Contrato
                 </Link>
               </div>
             </div>
@@ -218,7 +218,7 @@ export default function PaginaContratosEmpleado() {
                       : c
                   )
                 );
-                setToast("Contract voided successfully.");
+                setToast("Contrato anulado con éxito.");
               }}
               empleadoNombre={`${empleado.nombre} ${empleado.apellidos}`}
               empleadoCodigo={empleado.codigoEmpleado}
@@ -226,7 +226,7 @@ export default function PaginaContratosEmpleado() {
             />
 
             <p className="text-xs text-[#8aa3ad] mt-4">
-              Showing {contratosFiltrados.length} contracts of historical records
+              Mostrando {contratosFiltrados.length} contratos del historial
             </p>
           </>
         )}

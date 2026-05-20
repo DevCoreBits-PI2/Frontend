@@ -33,9 +33,9 @@ export default function PaginaDirectorioEmpleados() {
       {/* Barra superior con breadcrumb */}
       <header className="flex items-center justify-between px-6 py-3.5 bg-white border-b border-[#d1dde2] shrink-0">
         <nav className="flex items-center gap-1.5 text-xs text-[#8aa3ad]">
-          <span className="hover:text-[#203D47] cursor-pointer transition-colors">Dashboard</span>
+          <span className="hover:text-[#203D47] cursor-pointer transition-colors">Panel</span>
           <ChevronRight size={12} className="text-[#c5d5db]" />
-          <span className="text-[#0F1819] font-semibold">Employee Directory</span>
+          <span className="text-[#0F1819] font-semibold">Directorio de Empleados</span>
         </nav>
       </header>
 

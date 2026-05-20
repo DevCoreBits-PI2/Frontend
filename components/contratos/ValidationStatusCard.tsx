@@ -14,25 +14,25 @@ export default function ValidationStatusCard({
 }: ValidationStatusCardProps) {
   const items = [
     {
-      titulo: "Valid Date Range",
-      descripcion: "The start and end dates follow the company fiscal year policy.",
+      titulo: "Rango de Fechas Válido",
+      descripcion: "Las fechas de inicio y fin cumplen la política del año fiscal de la empresa.",
       ok: resultado.rangoFechasValido,
     },
     {
-      titulo: "No Overlapping Contracts",
-      descripcion: `${nombreEmpleado} has no other active contracts during this period.`,
+      titulo: "Sin Contratos Solapados",
+      descripcion: `${nombreEmpleado} no tiene otros contratos activos durante este período.`,
       ok: resultado.sinSolapamiento,
     },
     {
-      titulo: "Budget Approval",
-      descripcion: "The proposed base salary is within the department's Q3 budget.",
+      titulo: "Aprobación de Presupuesto",
+      descripcion: "El salario base propuesto está dentro del presupuesto Q3 del departamento.",
       ok: resultado.presupuestoAprobado,
     },
   ];
 
   return (
     <div className="bg-white rounded-2xl border border-[#e8eef0] p-5">
-      <h3 className="text-sm font-bold text-[#0F1819] mb-4">Validation Status</h3>
+      <h3 className="text-sm font-bold text-[#0F1819] mb-4">Estado de Validación</h3>
       <ul className="flex flex-col gap-3.5">
         {items.map((item) => (
           <li key={item.titulo} className="flex items-start gap-2.5">

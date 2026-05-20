@@ -100,7 +100,7 @@ export default function RegisterWorkChangeModal({ isOpen, onCerrar, onGuardar }:
                 <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
               </svg>
             </div>
-            <h2 className="text-base font-semibold text-[#0F1819]">Register Work Change</h2>
+            <h2 className="text-base font-semibold text-[#0F1819]">Registrar Cambio Laboral</h2>
           </div>
           <button
             onClick={handleCerrar}
@@ -117,7 +117,7 @@ export default function RegisterWorkChangeModal({ isOpen, onCerrar, onGuardar }:
           {/* Change Type */}
           <div>
             <label className="block text-xs font-semibold text-[#0F1819] mb-1">
-              Change Type
+              Tipo de Cambio
             </label>
             <div className="relative">
               <select
@@ -132,7 +132,7 @@ export default function RegisterWorkChangeModal({ isOpen, onCerrar, onGuardar }:
                 }
                 className="w-full appearance-none px-3 py-2 text-sm border border-[#d1dde2] rounded-xl text-[#0F1819] bg-white focus:outline-none focus:ring-1 focus:ring-[#4f98b0] cursor-pointer"
               >
-                <option value="" disabled>Select change type</option>
+                <option value="" disabled>Seleccionar tipo de cambio</option>
                 {TIPOS_CAMBIO.map((t) => (
                   <option key={t.valor} value={t.valor}>{t.etiqueta}</option>
                 ))}
@@ -144,7 +144,7 @@ export default function RegisterWorkChangeModal({ isOpen, onCerrar, onGuardar }:
           {/* Effective Date */}
           <div>
             <label className="block text-xs font-semibold text-[#0F1819] mb-1">
-              Effective Date
+              Fecha Efectiva
             </label>
             <div className="relative">
               <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8aa3ad]" />
@@ -160,7 +160,7 @@ export default function RegisterWorkChangeModal({ isOpen, onCerrar, onGuardar }:
           {/* Destination Area */}
           <div>
             <label className="block text-xs font-semibold text-[#0F1819] mb-1">
-              Destination Area
+              Área de Destino
             </label>
             <div className="relative">
               <select
@@ -168,7 +168,7 @@ export default function RegisterWorkChangeModal({ isOpen, onCerrar, onGuardar }:
                 onChange={(e) => setForm((prev) => ({ ...prev, areaDestino: e.target.value }))}
                 className="w-full appearance-none px-3 py-2 text-sm border border-[#d1dde2] rounded-xl text-[#0F1819] bg-white focus:outline-none focus:ring-1 focus:ring-[#4f98b0] cursor-pointer"
               >
-                <option value="" disabled>Select destination area</option>
+                <option value="" disabled>Seleccionar área de destino</option>
                 {areas.map((a) => (
                   <option key={a.id} value={a.id}>{a.nombre}</option>
                 ))}
@@ -180,7 +180,7 @@ export default function RegisterWorkChangeModal({ isOpen, onCerrar, onGuardar }:
           {/* New Position */}
           <div>
             <label className="block text-xs font-semibold text-[#0F1819] mb-1">
-              New Position
+              Nueva Posición
             </label>
             <div className="relative">
               <select
@@ -189,7 +189,7 @@ export default function RegisterWorkChangeModal({ isOpen, onCerrar, onGuardar }:
                 disabled={!form.areaDestino}
                 className="w-full appearance-none px-3 py-2 text-sm border border-[#d1dde2] rounded-xl text-[#0F1819] bg-white focus:outline-none focus:ring-1 focus:ring-[#4f98b0] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="" disabled>Select new position</option>
+                <option value="" disabled>Seleccionar nueva posición</option>
                 {posicionesFiltradas.map((p) => (
                   <option key={p.id} value={p.id}>{p.nombre}</option>
                 ))}
@@ -197,19 +197,19 @@ export default function RegisterWorkChangeModal({ isOpen, onCerrar, onGuardar }:
               <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8aa3ad] pointer-events-none" />
             </div>
             <p className="mt-1.5 text-xs text-[#8aa3ad]">
-              Only positions from the selected area are shown
+              Solo se muestran posiciones del área seleccionada
             </p>
           </div>
 
           {/* Reason / Justification */}
           <div>
             <label className="block text-xs font-semibold text-[#0F1819] mb-1">
-              Reason / Justification <span className="text-rose-500">*</span>
+              Razón / Justificación <span className="text-rose-500">*</span>
             </label>
             <textarea
               value={form.justificacion}
               onChange={(e) => setForm((prev) => ({ ...prev, justificacion: e.target.value }))}
-              placeholder="Explain why this transfer is occurring..."
+              placeholder="Explica por qué se está realizando este cambio..."
               rows={2}
               className="w-full px-3 py-2 text-sm text-[#0F1819] border border-[#d1dde2] rounded-xl resize-none focus:outline-none focus:ring-1 focus:ring-[#4f98b0] placeholder:text-[#c5d5db]"
             />
@@ -219,7 +219,7 @@ export default function RegisterWorkChangeModal({ isOpen, onCerrar, onGuardar }:
         {/* Warning */}
         <div className="mx-5 mb-3 flex items-start gap-2 bg-[#f4f7f8] border border-[#d1dde2] rounded-xl px-3 py-2.5 shrink-0">
           <p className="text-xs text-[#8aa3ad]">
-            This event will be permanently recorded in the employee&apos;s labor history and cannot be deleted.
+            Este evento se registrará permanentemente en el historial laboral del empleado y no se puede eliminar.
           </p>
         </div>
 
@@ -230,14 +230,14 @@ export default function RegisterWorkChangeModal({ isOpen, onCerrar, onGuardar }:
             disabled={cargando}
             className="px-4 py-2 text-sm text-[#8aa3ad] hover:text-[#0F1819] border border-[#d1dde2] rounded-lg transition-colors disabled:opacity-50"
           >
-            Cancel
+            Cancelar
           </button>
           <button
             onClick={handleGuardar}
             disabled={!puedeGuardar || cargando}
             className="px-4 py-2 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-400 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {cargando ? "Saving..." : "Save Change"}
+            {cargando ? "Guardando..." : "Guardar Cambio"}
           </button>
         </div>
 

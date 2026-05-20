@@ -27,11 +27,22 @@ import {
 } from "@/services/contratosService";
 import RenewContractFlow from "./RenewContractFlow";
 
+export interface EmpleadoInfoContrato {
+  nombre: string;
+  codigo: string;
+}
+
 interface ContratosTableProps {
   contratos: Contrato[];
   onVoidSuccess?: (id: string) => void;
   empleadoNombre?: string;
   empleadoCodigo?: string;
+  /**
+   * Si se proporciona, la tabla muestra una columna "Empleado" y usa este
+   * callback para resolver el nombre/código del empleado al abrir el panel
+   * de detalle. Útil para la vista global de contratos.
+   */
+  lookupEmpleado?: (idEmpleado: string) => EmpleadoInfoContrato | null;
   onContratoRenovado?: () => void;
 }
 
@@ -48,37 +59,37 @@ function obtenerIconoTipo(tipo: TipoContrato) {
 
 function etiquetaTipo(tipo: TipoContrato): string {
   switch (tipo) {
-    case "INDEFINIDO":    return "Indefinite Term";
-    case "FIJO":          return "Fixed Term";
-    case "SERVICIO":      return "Service Contract";
-    case "TIEMPO_PARCIAL":return "Part-time";
+    case "INDEFINIDO":    return "Término Indefinido";
+    case "FIJO":          return "Término Fijo";
+    case "SERVICIO":      return "Contrato de Servicios";
+    case "TIEMPO_PARCIAL":return "Tiempo Parcial";
   }
 }
 
 function badgeEstado(estado: EstadoContrato) {
   switch (estado) {
-    case "ACTIVO":   return { label: "Active",  cls: "bg-emerald-50 text-emerald-600"  };
-    case "RENOVADO": return { label: "Renewed", cls: "bg-sky-50 text-sky-600"          };
-    case "EXPIRADO": return { label: "Expired", cls: "bg-rose-50 text-rose-500"        };
-    case "ANULADO":  return { label: "Voided",  cls: "bg-slate-100 text-slate-500"     };
+    case "ACTIVO":   return { label: "Activo",   cls: "bg-emerald-50 text-emerald-600"  };
+    case "RENOVADO": return { label: "Renovado", cls: "bg-sky-50 text-sky-600"          };
+    case "EXPIRADO": return { label: "Expirado", cls: "bg-rose-50 text-rose-500"        };
+    case "ANULADO":  return { label: "Anulado",  cls: "bg-slate-100 text-slate-500"     };
   }
 }
 
 function barraValidez(validez: ValidezContrato) {
   switch (validez) {
-    case "ONGOING":   return { label: "ONGOING",   color: "bg-emerald-500" };
-    case "COMPLETED": return { label: "COMPLETED", color: "bg-sky-400"     };
-    case "EXPIRED":   return { label: "EXPIRED",   color: "bg-rose-400"    };
-    case "VOIDED":    return { label: "VOIDED",    color: "bg-slate-300"   };
+    case "ONGOING":   return { label: "EN CURSO",   color: "bg-emerald-500" };
+    case "COMPLETED": return { label: "COMPLETADO", color: "bg-sky-400"     };
+    case "EXPIRED":   return { label: "EXPIRADO",   color: "bg-rose-400"    };
+    case "VOIDED":    return { label: "ANULADO",    color: "bg-slate-300"   };
   }
 }
 
 
 function formatFecha(fecha: string | null): string {
-  if (!fecha) return "No expiration";
+  if (!fecha) return "Sin vencimiento";
   const d = new Date(fecha);
   if (Number.isNaN(d.getTime())) return fecha;
-  return d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+  return d.toLocaleDateString("es-ES", { month: "short", day: "2-digit", year: "numeric" });
 }
 
 // ── PDF download (no extra dependencies) ─────────────────────────────────────
@@ -93,10 +104,10 @@ function downloadPdf(c: Contrato) {
     c.estado === "EXPIRADO" ? "expired" : "voided";
 
   win.document.write(`<!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8"/>
-  <title>Contract ${c.id}</title>
+  <title>Contrato ${c.id}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'Segoe UI',Arial,sans-serif;color:#0F1819;padding:48px}
@@ -118,19 +129,19 @@ function downloadPdf(c: Contrato) {
 </head>
 <body>
   <div class="hdr">
-    <div><h1>Contract Details</h1><p>Reference ID: ${c.id}</p></div>
+    <div><h1>Detalles del Contrato</h1><p>ID de Referencia: ${c.id}</p></div>
     <span class="badge ${badgeClass}">${badgeEstado(c.estado).label}</span>
   </div>
   <div class="grid">
-    <div class="field"><label>Contract Type</label><p>${etiquetaTipo(c.tipo)}</p></div>
-    <div class="field"><label>Base Salary</label><p>${c.salarioBase.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}</p></div>
-    <div class="field"><label>Start Date</label><p>${formatFecha(c.fechaInicio)}</p></div>
-    <div class="field"><label>End Date</label><p>${formatFecha(c.fechaFin)}</p></div>
-    <div class="field"><label>Registration Date</label><p>${formatFecha(c.creadoEn)}</p></div>
-    <div class="field"><label>Status</label><p>${badgeEstado(c.estado).label}</p></div>
+    <div class="field"><label>Tipo de Contrato</label><p>${etiquetaTipo(c.tipo)}</p></div>
+    <div class="field"><label>Salario Base</label><p>${c.salarioBase.toLocaleString("es-ES", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}</p></div>
+    <div class="field"><label>Fecha de Inicio</label><p>${formatFecha(c.fechaInicio)}</p></div>
+    <div class="field"><label>Fecha de Fin</label><p>${formatFecha(c.fechaFin)}</p></div>
+    <div class="field"><label>Fecha de Registro</label><p>${formatFecha(c.creadoEn)}</p></div>
+    <div class="field"><label>Estado</label><p>${badgeEstado(c.estado).label}</p></div>
   </div>
   ${c.notas ? `<div class="notes">"${c.notas}"</div>` : ""}
-  <div class="footer">Generated on ${new Date().toLocaleDateString("en-US", { month: "long", day: "2-digit", year: "numeric" })} · HR Management System</div>
+  <div class="footer">Generado el ${new Date().toLocaleDateString("es-ES", { month: "long", day: "2-digit", year: "numeric" })} · Sistema de Gestión de RRHH</div>
 </body>
 </html>`);
   win.document.close();
@@ -195,7 +206,7 @@ function RowMenu({
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50">
                 <FileText size={13} className="text-rose-500" />
               </div>
-              Download as PDF
+              Descargar como PDF
             </button>
             <button
               type="button"
@@ -205,7 +216,7 @@ function RowMenu({
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-50">
                 <Eye size={13} className="text-sky-500" />
               </div>
-              View Details
+              Ver Detalles
             </button>
           </div>
         </>,
@@ -237,10 +248,10 @@ function statusBadgeColor(estado: EstadoContrato) {
 
 function statusNote(estado: EstadoContrato, fechaFin: string | null): string {
   switch (estado) {
-    case "ACTIVO":   return fechaFin ? `Active contract — expires ${formatFecha(fechaFin)}.` : "Active contract — No expiration date.";
-    case "RENOVADO": return "Contract has been renewed.";
-    case "EXPIRADO": return `Contract expired on ${formatFecha(fechaFin)}.`;
-    case "ANULADO":  return "This contract has been voided.";
+    case "ACTIVO":   return fechaFin ? `Contrato activo — vence el ${formatFecha(fechaFin)}.` : "Contrato activo — sin fecha de vencimiento.";
+    case "RENOVADO": return "El contrato ha sido renovado.";
+    case "EXPIRADO": return `El contrato expiró el ${formatFecha(fechaFin)}.`;
+    case "ANULADO":  return "Este contrato ha sido anulado.";
   }
 }
 
@@ -248,9 +259,9 @@ function formatFechaHora(fecha: string | null): string {
   if (!fecha) return "—";
   const d = new Date(fecha);
   if (Number.isNaN(d.getTime())) return fecha;
-  return d.toLocaleDateString("en-US", {
+  return d.toLocaleDateString("es-ES", {
     month: "short", day: "2-digit", year: "numeric",
-  }) + " " + d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  }) + " " + d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
 
 // ── Contract detail side panel ────────────────────────────────────────────────
@@ -268,13 +279,11 @@ function ContractDetailPanel({
   empleadoCodigo: string;
   onClose: () => void;
   onVoidSuccess: (id: string) => void;
+  onContratoRenovado?: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
   const [showVoidConfirm, setShowVoidConfirm] = useState(false);
   const [voiding, setVoiding] = useState(false);
-  onContratoRenovado?: () => void;
-}) {
-  const [mounted, setMounted] = useState(false);
   const [renewOpen, setRenewOpen] = useState(false);
   const estado = badgeEstado(contrato.estado);
   const tipo = etiquetaTipo(contrato.tipo);
@@ -320,11 +329,11 @@ function ContractDetailPanel({
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
-          <h2 className="text-base font-bold text-[#0F1819]">Contract Details</h2>
+          <h2 className="text-base font-bold text-[#0F1819]">Detalles del Contrato</h2>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label="Cerrar"
             className="flex h-7 w-7 items-center justify-center rounded-lg text-[#8aa3ad] hover:text-[#0F1819] hover:bg-[#f4f7f8] transition-colors"
           >
             <X size={15} />
@@ -338,7 +347,7 @@ function ContractDetailPanel({
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">
-                Current Status
+                Estado Actual
               </span>
               <span className={`rounded-full px-3 py-0.5 text-[11px] font-bold ${statusBadgeColor(contrato.estado)}`}>
                 {estado.label}
@@ -362,7 +371,7 @@ function ContractDetailPanel({
           {/* ── Contract Type ── */}
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">
-              Contract Type
+              Tipo de Contrato
             </span>
             <span className="text-[15px] font-bold text-[#0F1819]">{tipo}</span>
           </div>
@@ -370,42 +379,42 @@ function ContractDetailPanel({
           {/* ── Dates ── */}
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">Start Date</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">Fecha de Inicio</span>
               <span className="text-sm font-semibold text-[#0F1819]">{formatFecha(contrato.fechaInicio)}</span>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">End Date</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">Fecha de Fin</span>
               <span className="text-sm font-semibold text-[#0F1819]">{formatFecha(contrato.fechaFin)}</span>
             </div>
           </div>
 
           {/* ── Registered By ── */}
           <div className="flex flex-col gap-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">Registered By</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">Registrado Por</span>
             <div className="flex items-center gap-2">
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#ECEFF1]">
                 <User size={13} className="text-[#576975]" />
               </div>
-              <span className="text-sm font-semibold text-[#0F1819]">HR Department</span>
+              <span className="text-sm font-semibold text-[#0F1819]">Departamento de RRHH</span>
             </div>
           </div>
 
           {/* ── Registration Date ── */}
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">Registration Date</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">Fecha de Registro</span>
             <span className="text-sm font-semibold text-[#0F1819]">{formatFechaHora(contrato.creadoEn)}</span>
           </div>
 
           {/* ── Last Modified ── */}
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">Last Modified</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">Última Modificación</span>
             <span className="text-sm font-semibold text-[#0F1819]">{formatFechaHora(contrato.creadoEn)}</span>
           </div>
 
           {/* ── Notes ── */}
           {contrato.notas && (
             <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">Notes</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[#8aa3ad]">Notas</span>
               <p className="text-sm leading-relaxed text-[#576975] italic">
                 "{contrato.notas}"
               </p>
@@ -423,7 +432,7 @@ function ContractDetailPanel({
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#2ECC71] py-3 text-sm font-semibold text-[#2ECC71] transition-colors hover:bg-[#2ECC71]/5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw size={14} />
-              Renew contract
+              Renovar Contrato
             </button>
             <button
               type="button"
@@ -434,7 +443,7 @@ function ContractDetailPanel({
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-400 py-3 text-sm font-semibold text-sky-500 transition-colors hover:bg-sky-50"
             >
               <Pencil size={14} />
-              Edit Contract
+              Editar Contrato
             </button>
             <button
               type="button"
@@ -443,7 +452,7 @@ function ContractDetailPanel({
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-400 py-3 text-sm font-semibold text-rose-500 transition-colors hover:bg-rose-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Ban size={14} />
-              Void Contract
+              Anular Contrato
             </button>
           </div>
         </div>
@@ -459,10 +468,10 @@ function ContractDetailPanel({
                 <AlertTriangle size={28} className="text-rose-500" />
               </div>
               <h3 className="text-base font-bold text-[#0F1819] text-center">
-                Contract Cancellation Warning
+                Advertencia de Cancelación de Contrato
               </h3>
               <p className="text-sm text-[#576975] text-center leading-relaxed">
-                You are about to cancel this contract. If you proceed, this action cannot be undone. Once confirmed, the employee&apos;s status within the organization could be affected. Please review and update the employee&apos;s status from the Employee Panel if necessary before proceeding.
+                Estás a punto de cancelar este contrato. Si continúas, esta acción no se podrá deshacer. Una vez confirmada, el estado del empleado dentro de la organización podría verse afectado. Por favor revisa y actualiza el estado del empleado desde el Panel de Empleado si es necesario antes de continuar.
               </p>
               <div className="flex gap-3 w-full mt-1">
                 <button
@@ -471,7 +480,7 @@ function ContractDetailPanel({
                   onClick={() => setShowVoidConfirm(false)}
                   className="flex-1 py-2.5 rounded-xl border border-[#d1dde2] text-sm font-semibold text-[#0F1819] hover:bg-[#f4f7f8] transition-colors disabled:opacity-50"
                 >
-                  Cancel
+                  Cancelar
                 </button>
                 <button
                   type="button"
@@ -479,7 +488,7 @@ function ContractDetailPanel({
                   onClick={handleVoidConfirm}
                   className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-sm font-semibold text-white hover:bg-emerald-400 transition-colors disabled:opacity-50"
                 >
-                  {voiding ? "Voiding…" : "Continue"}
+                  {voiding ? "Anulando…" : "Continuar"}
                 </button>
               </div>
             </div>
@@ -505,14 +514,25 @@ function ContractDetailPanel({
 
 // ── Main table ────────────────────────────────────────────────────────────────
 
-export default function ContratosTable({ contratos, onVoidSuccess }: ContratosTableProps) {
 export default function ContratosTable({
   contratos,
+  onVoidSuccess,
   empleadoNombre = "",
   empleadoCodigo = "",
+  lookupEmpleado,
   onContratoRenovado,
 }: ContratosTableProps) {
   const [panelContrato, setPanelContrato] = useState<Contrato | null>(null);
+  const modoMultiEmpleado = !!lookupEmpleado;
+
+  const empleadoDelPanel: EmpleadoInfoContrato = panelContrato && lookupEmpleado
+    ? lookupEmpleado(panelContrato.idEmpleado) ?? { nombre: empleadoNombre, codigo: empleadoCodigo }
+    : { nombre: empleadoNombre, codigo: empleadoCodigo };
+
+  const colSpanVacio = modoMultiEmpleado ? 7 : 6;
+  const mensajeVacio = modoMultiEmpleado
+    ? "No se encontraron contratos."
+    : "Aún no hay contratos registrados para este empleado.";
 
   return (
     <>
@@ -520,19 +540,22 @@ export default function ContratosTable({
         <table className="w-full">
           <thead>
             <tr className="border-b border-[#f0f4f5]">
-              <th className="px-5 py-3 text-left text-[10px] font-bold text-[#8aa3ad] uppercase tracking-widest">Contract Type</th>
-              <th className="px-5 py-3 text-left text-[10px] font-bold text-[#8aa3ad] uppercase tracking-widest">Start Date</th>
-              <th className="px-5 py-3 text-left text-[10px] font-bold text-[#8aa3ad] uppercase tracking-widest">End Date</th>
-              <th className="px-5 py-3 text-left text-[10px] font-bold text-[#8aa3ad] uppercase tracking-widest">Status</th>
-              <th className="px-5 py-3 text-left text-[10px] font-bold text-[#8aa3ad] uppercase tracking-widest">Validity</th>
-              <th className="px-5 py-3 text-left text-[10px] font-bold text-[#8aa3ad] uppercase tracking-widest">Actions</th>
+              {modoMultiEmpleado && (
+                <th className="px-5 py-3 text-left text-[10px] font-bold text-[#8aa3ad] uppercase tracking-widest">Empleado</th>
+              )}
+              <th className="px-5 py-3 text-left text-[10px] font-bold text-[#8aa3ad] uppercase tracking-widest">Tipo de Contrato</th>
+              <th className="px-5 py-3 text-left text-[10px] font-bold text-[#8aa3ad] uppercase tracking-widest">Fecha de Inicio</th>
+              <th className="px-5 py-3 text-left text-[10px] font-bold text-[#8aa3ad] uppercase tracking-widest">Fecha de Fin</th>
+              <th className="px-5 py-3 text-left text-[10px] font-bold text-[#8aa3ad] uppercase tracking-widest">Estado</th>
+              <th className="px-5 py-3 text-left text-[10px] font-bold text-[#8aa3ad] uppercase tracking-widest">Validez</th>
+              <th className="px-5 py-3 text-left text-[10px] font-bold text-[#8aa3ad] uppercase tracking-widest">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {contratos.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sm text-[#8aa3ad]">
-                  No contracts registered for this employee yet.
+                <td colSpan={colSpanVacio} className="px-5 py-10 text-center text-sm text-[#8aa3ad]">
+                  {mensajeVacio}
                 </td>
               </tr>
             ) : (
@@ -541,12 +564,25 @@ export default function ContratosTable({
                 const estado = badgeEstado(c.estado);
                 const validez = barraValidez(c.validez);
                 const atenuado = c.estado === "ANULADO";
+                const empleadoInfo = lookupEmpleado?.(c.idEmpleado);
 
                 return (
                   <tr
                     key={c.id}
                     className={`border-b border-[#f0f4f5] last:border-b-0 hover:bg-[#f8fafb] transition-colors ${atenuado ? "opacity-60" : ""}`}
                   >
+                    {modoMultiEmpleado && (
+                      <td className="px-5 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-[#0F1819]">
+                            {empleadoInfo?.nombre ?? "—"}
+                          </span>
+                          <span className="text-[11px] text-[#8aa3ad]">
+                            #{empleadoInfo?.codigo ?? c.idEmpleado}
+                          </span>
+                        </div>
+                      </td>
+                    )}
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2.5">
                         <Icono size={16} className={color} />
@@ -582,8 +618,8 @@ export default function ContratosTable({
       {panelContrato && (
         <ContractDetailPanel
           contrato={panelContrato}
-          empleadoNombre={empleadoNombre}
-          empleadoCodigo={empleadoCodigo}
+          empleadoNombre={empleadoDelPanel.nombre}
+          empleadoCodigo={empleadoDelPanel.codigo}
           onClose={() => setPanelContrato(null)}
           onVoidSuccess={(id) => {
             setPanelContrato(null);

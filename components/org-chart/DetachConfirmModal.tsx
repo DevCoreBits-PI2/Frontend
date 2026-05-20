@@ -25,7 +25,7 @@ export default function DetachConfirmModal({ position, onClose, onConfirm }: Pro
               <AlertTriangle size={16} className="text-amber-500" />
             </div>
             <h2 className="text-base font-bold text-[#0F1819] leading-snug">
-              Remove this hierarchical relationship?
+              ¿Eliminar esta relación jerárquica?
             </h2>
           </div>
           <button
@@ -38,12 +38,10 @@ export default function DetachConfirmModal({ position, onClose, onConfirm }: Pro
 
         <div className="pl-12 flex flex-col gap-2.5">
           <p className="text-sm text-[#4a7880]">
-            Are you sure you want to remove this hierarchical relationship?
+            ¿Estás seguro de que deseas eliminar esta relación jerárquica?
           </p>
           <p className="text-sm text-[#4a7880]">
-            <span className="font-semibold text-[#0F1819]">Important:</span> The positions will not
-            be deleted. They will simply be reorganized under the next higher position. The removed
-            area will only be excluded from this hierarchy but will not be eliminated.
+            <span className="font-semibold text-[#0F1819]">Importante:</span> Las posiciones no serán eliminadas. Simplemente se reorganizarán bajo la siguiente posición superior. El área removida solo será excluida de esta jerarquía pero no será eliminada.
           </p>
         </div>
 
@@ -52,13 +50,13 @@ export default function DetachConfirmModal({ position, onClose, onConfirm }: Pro
             onClick={onClose}
             className="px-5 py-2.5 text-sm font-semibold text-[#4a7880] hover:text-[#0F1819] transition-colors"
           >
-            Cancel
+            Cancelar
           </button>
           <button
             onClick={onConfirm}
             className="px-6 py-2.5 bg-rose-500 hover:bg-rose-400 text-white text-sm font-semibold rounded-xl transition-colors"
           >
-            Detach
+            Desvincular
           </button>
         </div>
       </div>

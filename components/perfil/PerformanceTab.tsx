@@ -18,26 +18,26 @@ const CHART_POINTS = [
 const EVALUATIONS = [
   {
     id: "1",
-    title: "Q1 - 2024 Quarterly Review",
+    title: "Revisión Trimestral Q1 - 2024",
     reviewer: "Sarah Chan",
-    date: "Mar 14, 2024",
+    date: "14 Mar, 2024",
     score: 4.06,
     isRecent: true,
     competencies: [
-      { name: "Core Technical Proficiency",  score: 3.8 },
-      { name: "Team Leadership & Mentoring", score: 4.5 },
-      { name: "Strategic Innovation",        score: 3.2 },
-      { name: "Impact & Delivery",           score: 4.1 },
-      { name: "Reliability & Ownership",     score: 4.7 },
+      { name: "Competencia Técnica Core",        score: 3.8 },
+      { name: "Liderazgo y Mentoría de Equipo",  score: 4.5 },
+      { name: "Innovación Estratégica",           score: 3.2 },
+      { name: "Impacto y Entrega",                score: 4.1 },
+      { name: "Confiabilidad y Apropiación",      score: 4.7 },
     ],
     observations:
-      '"Alex continues to anchor the infrastructure team with exceptional technical reliability. His leadership during the Q1 migration was pivotal. Focus for Q2 should be on broader architectural innovation and cross-departmental strategy alignment."',
+      '"Alex sigue siendo un pilar del equipo de infraestructura por su excepcional confiabilidad técnica. Su liderazgo durante la migración del Q1 fue clave. El enfoque para el Q2 debe ser una innovación arquitectónica más amplia y la alineación estratégica interdepartamental."',
   },
   {
     id: "2",
-    title: "Annual Performance Audit - 2023",
+    title: "Auditoría de Desempeño Anual - 2023",
     reviewer: "James Morton",
-    date: "Dec 20, 2023",
+    date: "20 Dic, 2023",
     score: 3.92,
     isRecent: false,
     competencies: [],
@@ -45,9 +45,9 @@ const EVALUATIONS = [
   },
   {
     id: "3",
-    title: "Q3 - 2023 Quarterly Review",
+    title: "Revisión Trimestral Q3 - 2023",
     reviewer: "Sarah Chan",
-    date: "Sep 15, 2023",
+    date: "15 Sep, 2023",
     score: 3.85,
     isRecent: false,
     competencies: [],
@@ -108,8 +108,8 @@ function PerformanceLineChart() {
 
 function RadarChart() {
   const cx = 90, cy = 82, R = 55;
-  const labels = ["CORE", "LEAD", "STRAT", "IMPACT", "OWNER"];
-  const values  = [0.76,   0.90,   0.64,   0.82,    0.94];
+  const labels = ["CORE", "LIDER", "ESTRAT", "IMPACTO", "PROP"];
+  const values  = [0.76,   0.90,   0.64,    0.82,      0.94];
 
   const angle = (i: number) => ((90 - i * 72) * Math.PI) / 180;
   const pt = (i: number, scale = 1) => ({
@@ -178,16 +178,16 @@ export function PerformanceMain() {
       <div className="rounded-xl bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-bold uppercase tracking-widest text-[#0F1819]">
-            Performance Over Time
+            Desempeño en el Tiempo
           </h2>
           <div className="flex items-center gap-4 text-[10px] text-[#8aa3ad]">
             <span className="flex items-center gap-1.5">
               <span className="inline-block w-4 h-0.5 rounded bg-emerald-500" />
-              Overall Score
+              Puntuación General
             </span>
             <span className="flex items-center gap-1.5">
               <span className="inline-block w-4 h-0.5 rounded" style={{ background: "repeating-linear-gradient(90deg,#c5d5db 0,#c5d5db 3px,transparent 3px,transparent 6px)" }} />
-              Peer Average
+              Promedio de Pares
             </span>
           </div>
         </div>
@@ -198,7 +198,7 @@ export function PerformanceMain() {
       <div className="rounded-xl bg-white shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 border-b border-[#f0f4f5]">
           <h2 className="text-xs font-bold uppercase tracking-widest text-[#0F1819]">
-            Evaluation History
+            Historial de Evaluaciones
           </h2>
         </div>
 
@@ -225,14 +225,14 @@ export function PerformanceMain() {
               {/* Title */}
               <div className="flex-1 min-w-0 text-left">
                 <p className="text-sm font-semibold text-[#0F1819] truncate">{ev.title}</p>
-                <p className="text-xs text-[#8aa3ad]">by {ev.reviewer} · {ev.date}</p>
+                <p className="text-xs text-[#8aa3ad]">por {ev.reviewer} · {ev.date}</p>
               </div>
 
               {/* Score */}
               <div className="flex items-center gap-2 shrink-0">
                 <div className="text-right">
                   <p className="text-base font-bold text-[#0F1819] leading-none">{ev.score.toFixed(2)}</p>
-                  <p className="text-[9px] uppercase tracking-widest text-[#8aa3ad] mt-0.5">Weighted Score</p>
+                  <p className="text-[9px] uppercase tracking-widest text-[#8aa3ad] mt-0.5">Puntuación Ponderada</p>
                 </div>
                 {expanded === ev.id
                   ? <ChevronUp size={14} className="text-[#8aa3ad]" />
@@ -246,7 +246,7 @@ export function PerformanceMain() {
               <div className="grid grid-cols-2 gap-5 px-5 pb-5 pt-4 bg-[#fafcfc] border-t border-[#f0f4f5]">
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-widest text-[#8aa3ad] mb-3">
-                    Competency Breakdown
+                    Desglose de Competencias
                   </p>
                   <div className="space-y-3">
                     {ev.competencies.map((c) => <CompetencyBar key={c.name} {...c} />)}
@@ -254,7 +254,7 @@ export function PerformanceMain() {
                 </div>
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-widest text-[#8aa3ad] mb-3">
-                    Auditor Observations
+                    Observaciones del Auditor
                   </p>
                   <p className="text-xs text-[#203D47] leading-relaxed italic">{ev.observations}</p>
                 </div>
@@ -277,7 +277,7 @@ export function PerformanceSidebar() {
 
         <div className="relative">
           <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-3">
-            Latest Audit Result
+            Última Auditoría
           </p>
 
           <div className="flex items-end gap-1.5 mb-1">
@@ -287,11 +287,11 @@ export function PerformanceSidebar() {
 
           <div className="flex items-center gap-1 mb-3">
             <TrendingUp size={11} className="text-emerald-400" />
-            <span className="text-[10px] font-bold text-emerald-400">+3.5% VS PREV PERIOD</span>
+            <span className="text-[10px] font-bold text-emerald-400">+3.5% VS PERÍODO ANTERIOR</span>
           </div>
 
           <div className="flex flex-wrap gap-1.5 mb-3">
-            {["EXCEEDS TARGETS", "HIGH TRUST"].map((tag) => (
+            {["SUPERA OBJETIVOS", "ALTA CONFIANZA"].map((tag) => (
               <span key={tag} className="text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded">
                 {tag}
               </span>
@@ -302,7 +302,7 @@ export function PerformanceSidebar() {
           </div>
 
           <p className="text-[10px] text-white/50 leading-relaxed">
-            Alex is currently ranked in the 94th percentile of Senior Architects within the Engineering Division.
+            Alex se encuentra actualmente en el percentil 94 de Arquitectos Senior dentro de la División de Ingeniería.
           </p>
         </div>
       </div>
@@ -310,24 +310,24 @@ export function PerformanceSidebar() {
       {/* Competency Profile */}
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <p className="text-[9px] font-bold uppercase tracking-widest text-[#8aa3ad] mb-1">
-          Competency Profile
+          Perfil de Competencias
         </p>
         <RadarChart />
         <button className="w-full text-center text-[9px] font-bold uppercase tracking-widest text-[#8aa3ad] hover:text-[#203D47] transition-colors mt-1">
-          View Detailed Metrics
+          Ver Métricas Detalladas
         </button>
       </div>
 
       {/* Leadership Insights */}
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <p className="text-[9px] font-bold uppercase tracking-widest text-[#8aa3ad] mb-3">
-          Leadership Insights
+          Insights de Liderazgo
         </p>
         <div className="flex items-start gap-3">
           <span className="text-2xl font-extrabold text-emerald-500 leading-none">4</span>
           <div>
-            <p className="text-sm font-semibold text-[#0F1819]">Active Mentees</p>
-            <p className="text-xs text-[#8aa3ad] leading-snug">High peer feedback for knowledge sharing</p>
+            <p className="text-sm font-semibold text-[#0F1819]">Mentees Activos</p>
+            <p className="text-xs text-[#8aa3ad] leading-snug">Alto feedback de pares por compartir conocimiento</p>
           </div>
         </div>
       </div>

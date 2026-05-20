@@ -49,7 +49,7 @@ export default function PositionsTable({
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
-        <div className="text-[#8aa3ad]">Loading positions...</div>
+        <div className="text-[#8aa3ad]">Cargando posiciones...</div>
       </div>
     );
   }
@@ -57,7 +57,7 @@ export default function PositionsTable({
   if (!positions || positions.data.length === 0) {
     return (
       <div className="flex justify-center items-center py-12">
-        <div className="text-[#8aa3ad]">No positions found</div>
+        <div className="text-[#8aa3ad]">No se encontraron posiciones</div>
       </div>
     );
   }
@@ -71,19 +71,19 @@ export default function PositionsTable({
           <thead>
             <tr className="border-b border-[#BDD5EA]">
               <th className="px-0 py-3 text-left text-xs font-semibold text-[#203D47] uppercase tracking-wider">
-                POSITION
+                POSICIÓN
               </th>
               <th className="px-0 py-3 text-left text-xs font-semibold text-[#203D47] uppercase tracking-wider">
-                EMPLOYEES
+                EMPLEADOS
               </th>
               <th className="px-0 py-3 text-left text-xs font-semibold text-[#203D47] uppercase tracking-wider">
-                SUPERIOR POSITION
+                POSICIÓN SUPERIOR
               </th>
               <th className="px-0 py-3 text-left text-xs font-semibold text-[#203D47] uppercase tracking-wider">
-                STATUS
+                ESTADO
               </th>
               <th className="px-0 py-3 text-left text-xs font-semibold text-[#203D47] uppercase tracking-wider">
-                ACTIONS
+                ACCIONES
               </th>
             </tr>
           </thead>
@@ -103,7 +103,7 @@ export default function PositionsTable({
       {/* Pagination */}
       <div className="flex items-center justify-between pt-2">
         <div className="text-xs text-[#8aa3ad] font-medium">
-          Showing {(currentPage - 1) * positions.pageSize + 1} of {positions.total} positions
+          Mostrando {(currentPage - 1) * positions.pageSize + 1} de {positions.total} posiciones
         </div>
         <div className="flex gap-2 items-center">
           <button

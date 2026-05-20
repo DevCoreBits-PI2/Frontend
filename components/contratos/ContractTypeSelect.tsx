@@ -11,8 +11,8 @@ interface OpcionTipo {
 }
 
 const OPCIONES: OpcionTipo[] = [
-  { valor: "FIJO", etiqueta: "Fixed-Term", descripcion: "Standard benefits & 40h/week" },
-  { valor: "INDEFINIDO", etiqueta: "Indefinite Term" },
+  { valor: "FIJO", etiqueta: "Término Fijo", descripcion: "Beneficios estándar y 40h/semana" },
+  { valor: "INDEFINIDO", etiqueta: "Término Indefinido" },
 ];
 
 interface ContractTypeSelectProps {

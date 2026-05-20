@@ -22,10 +22,10 @@ const VALIDACION_INICIAL: ResultadoValidacion = {
 
 function etiquetaTipo(tipo: Contrato["tipo"]): string {
   switch (tipo) {
-    case "INDEFINIDO":    return "Full-Time Permanent";
-    case "FIJO":          return "Fixed Term";
-    case "SERVICIO":      return "Service Contract";
-    case "TIEMPO_PARCIAL":return "Part-time";
+    case "INDEFINIDO":    return "Tiempo Completo Permanente";
+    case "FIJO":          return "Término Fijo";
+    case "SERVICIO":      return "Contrato de Servicios";
+    case "TIEMPO_PARCIAL":return "Tiempo Parcial";
   }
 }
 
@@ -33,7 +33,7 @@ function formatIsoToDisplay(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", { month: "long", day: "2-digit", year: "numeric" });
+  return d.toLocaleDateString("es-ES", { month: "long", day: "2-digit", year: "numeric" });
 }
 
 // ── Locked input (read-only, with padlock icon) ───────────────────────────────
@@ -53,16 +53,16 @@ function LockedInput({ value }: { value: string }) {
 // ── Validation status card ────────────────────────────────────────────────────
 function ValidationCard({ resultado }: { resultado: ResultadoValidacion }) {
   const items = [
-    { label: "Contract Integrity",  ok: resultado.rangoFechasValido && resultado.sinSolapamiento },
-    { label: "Salary Compliance",   ok: resultado.presupuestoAprobado },
-    { label: "Date Overlap Check",  ok: resultado.sinSolapamiento },
+    { label: "Integridad del Contrato", ok: resultado.rangoFechasValido && resultado.sinSolapamiento },
+    { label: "Cumplimiento Salarial",   ok: resultado.presupuestoAprobado },
+    { label: "Verificación de Solapamiento", ok: resultado.sinSolapamiento },
   ];
 
   const allValid = items.every((i) => i.ok);
 
   return (
     <div className="bg-white rounded-2xl border border-[#e8eef0] p-5 flex flex-col gap-4">
-      <h3 className="text-sm font-bold text-[#0F1819]">Validation Status</h3>
+      <h3 className="text-sm font-bold text-[#0F1819]">Estado de Validación</h3>
 
       <div className="flex flex-col gap-3">
         {items.map((item) => (
@@ -81,7 +81,7 @@ function ValidationCard({ resultado }: { resultado: ResultadoValidacion }) {
                   : "bg-rose-50 text-rose-500"
               }`}
             >
-              {item.ok ? "Valid" : "Invalid"}
+              {item.ok ? "Válido" : "Inválido"}
             </span>
           </div>
         ))}
@@ -89,8 +89,8 @@ function ValidationCard({ resultado }: { resultado: ResultadoValidacion }) {
 
       <p className="text-xs text-[#8aa3ad] leading-relaxed border-t border-[#f0f4f5] pt-3">
         {allValid
-          ? "All contract conditions meet organizational standards. System validation is complete and ready for submission."
-          : "Some conditions are not met. Please review the highlighted fields before saving."}
+          ? "Todas las condiciones del contrato cumplen los estándares de la organización. La validación del sistema está completa y lista para enviar."
+          : "Algunas condiciones no se cumplen. Por favor revisa los campos resaltados antes de guardar."}
       </p>
     </div>
   );
@@ -168,7 +168,7 @@ export default function PaginaEditarContrato() {
       <div className="flex h-full items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#203D47] border-t-[#2ECC71]" />
-          <span className="text-xs text-[#8aa3ad]">Loading...</span>
+          <span className="text-xs text-[#8aa3ad]">Cargando...</span>
         </div>
       </div>
     );
@@ -178,7 +178,7 @@ export default function PaginaEditarContrato() {
     return (
       <div className="p-6">
         <div className="rounded-xl border border-rose-200 bg-white px-6 py-4 text-sm text-rose-500">
-          {error ?? "Unexpected error"}
+          {error ?? "Error inesperado"}
         </div>
       </div>
     );
@@ -189,11 +189,11 @@ export default function PaginaEditarContrato() {
       {/* Breadcrumb */}
       <header className="flex shrink-0 items-center justify-between border-b border-[#d1dde2] bg-white px-6 py-3.5">
         <nav className="flex items-center gap-1.5 text-xs text-[#8aa3ad]">
-          <Link href="/dashboard" className="transition-colors hover:text-[#203D47]">Dashboard</Link>
+          <Link href="/dashboard" className="transition-colors hover:text-[#203D47]">Panel</Link>
           <ChevronRight size={12} className="text-[#c5d5db]" />
-          <Link href={`/dashboard/empleados/${empleadoId}/contratos`} className="transition-colors hover:text-[#203D47]">Contracts</Link>
+          <Link href={`/dashboard/empleados/${empleadoId}/contratos`} className="transition-colors hover:text-[#203D47]">Contratos</Link>
           <ChevronRight size={12} className="text-[#c5d5db]" />
-          <span className="font-semibold text-[#0F1819]">Edit Contract</span>
+          <span className="font-semibold text-[#0F1819]">Editar Contrato</span>
         </nav>
       </header>
 
@@ -201,14 +201,14 @@ export default function PaginaEditarContrato() {
         {/* Title row */}
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-xl font-bold text-[#0F1819]">
-            Edit Contract: {empleado.nombre} {empleado.apellidos}
+            Editar Contrato: {empleado.nombre} {empleado.apellidos}
           </h1>
           <div className="flex items-center gap-3">
             <Link
               href={`/dashboard/empleados/${empleadoId}/contratos`}
               className="rounded-lg border border-[#d1dde2] bg-white px-4 py-2 text-sm font-medium text-[#576975] transition-colors hover:text-[#0F1819]"
             >
-              Cancel
+              Cancelar
             </Link>
             <button
               type="button"
@@ -216,7 +216,7 @@ export default function PaginaEditarContrato() {
               disabled={!formularioValido || guardando}
               className="rounded-lg bg-[#2ECC71] px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {guardando ? "Saving..." : "Save Changes"}
+              {guardando ? "Guardando..." : "Guardar Cambios"}
             </button>
           </div>
         </div>
@@ -226,9 +226,9 @@ export default function PaginaEditarContrato() {
           <div className="mb-6 flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3.5">
             <Info size={16} className="mt-0.5 shrink-0 text-sky-500" />
             <div>
-              <p className="text-sm font-semibold text-sky-700">Active Contract</p>
+              <p className="text-sm font-semibold text-sky-700">Contrato Activo</p>
               <p className="text-xs text-sky-600">
-                You are editing an active contract. Changes will be logged for audit purposes.
+                Estás editando un contrato activo. Los cambios quedarán registrados para auditoría.
               </p>
             </div>
           </div>
@@ -239,24 +239,24 @@ export default function PaginaEditarContrato() {
 
           {/* ── Contract Details card ── */}
           <div className="rounded-2xl border border-[#e8eef0] bg-white p-6">
-            <h2 className="mb-5 text-sm font-bold text-[#0F1819]">Contract Details</h2>
+            <h2 className="mb-5 text-sm font-bold text-[#0F1819]">Detalles del Contrato</h2>
 
             <div className="grid grid-cols-2 gap-x-5 gap-y-4">
               {/* Contract Type — locked */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-[#576975]">Contract Type</label>
+                <label className="text-xs font-medium text-[#576975]">Tipo de Contrato</label>
                 <LockedInput value={etiquetaTipo(contrato.tipo)} />
               </div>
 
               {/* Start Date — locked */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-[#576975]">Start Date</label>
+                <label className="text-xs font-medium text-[#576975]">Fecha de Inicio</label>
                 <LockedInput value={formatIsoToDisplay(contrato.fechaInicio)} />
               </div>
 
               {/* End Date — editable */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-[#576975]">End Date</label>
+                <label className="text-xs font-medium text-[#576975]">Fecha de Fin</label>
                 <input
                   type="date"
                   value={fechaFin}
@@ -267,7 +267,7 @@ export default function PaginaEditarContrato() {
 
               {/* Salary — editable */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-[#576975]">Base Salary (Annual)</label>
+                <label className="text-xs font-medium text-[#576975]">Salario Base (Anual)</label>
                 <div className="relative">
                   <DollarSign size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8aa3ad]" />
                   <input
@@ -284,12 +284,12 @@ export default function PaginaEditarContrato() {
 
             {/* Notes — full width */}
             <div className="mt-4 flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-[#576975]">Contract Notes</label>
+              <label className="text-xs font-medium text-[#576975]">Notas del Contrato</label>
               <textarea
                 value={notas}
                 onChange={(e) => setNotas(e.target.value)}
                 rows={4}
-                placeholder="Add any additional notes or conditions..."
+                placeholder="Añade cualquier nota o condición adicional..."
                 className="w-full resize-none rounded-lg border border-[#d1dde2] bg-white px-3.5 py-2.5 text-sm text-[#0F1819] outline-none transition focus:border-[#2ECC71] focus:ring-2 focus:ring-[#2ECC71]/20 placeholder:text-[#c5d5db]"
               />
             </div>

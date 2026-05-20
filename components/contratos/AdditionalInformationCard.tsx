@@ -38,12 +38,12 @@ export default function AdditionalInformationCard({
       {/* Encabezado */}
       <header className="flex items-center gap-2 mb-5">
         <ClipboardEdit size={16} className="text-emerald-500" />
-        <h2 className="text-sm font-bold text-[#0F1819]">Additional Information</h2>
+        <h2 className="text-sm font-bold text-[#0F1819]">Información Adicional</h2>
       </header>
 
       {/* Salario */}
       <div className="flex flex-col gap-1.5 mb-5">
-        <label className="text-xs font-medium text-[#0F1819]">Base Salary (Annual)</label>
+        <label className="text-xs font-medium text-[#0F1819]">Salario Base (Anual)</label>
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#8aa3ad]">$</span>
           <input
@@ -63,11 +63,11 @@ export default function AdditionalInformationCard({
 
       {/* Notas */}
       <div className="flex flex-col gap-1.5 mb-5">
-        <label className="text-xs font-medium text-[#0F1819]">Notes / Conditions</label>
+        <label className="text-xs font-medium text-[#0F1819]">Notas / Condiciones</label>
         <textarea
           value={notas}
           onChange={(e) => onNotasChange(e.target.value)}
-          placeholder="Enter any specific clauses or conditions..."
+          placeholder="Ingresa cualquier cláusula o condición específica..."
           rows={3}
           className="w-full px-3.5 py-2.5 text-sm border border-[#d1dde2] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 text-[#0F1819] placeholder:text-[#c5d5db] resize-none bg-white"
         />
@@ -75,7 +75,7 @@ export default function AdditionalInformationCard({
 
       {/* Documento */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-[#0F1819]">Contract Document</label>
+        <label className="text-xs font-medium text-[#0F1819]">Documento del Contrato</label>
 
         {documento ? (
           <div className="flex items-center justify-between bg-[#f8fafb] border border-[#e8eef0] rounded-xl px-4 py-3">
@@ -106,8 +106,8 @@ export default function AdditionalInformationCard({
             className="flex flex-col items-center justify-center gap-1.5 bg-[#f8fafb] border border-dashed border-[#d1dde2] rounded-xl px-4 py-8 cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/30 transition-colors"
           >
             <CloudUpload size={22} className="text-[#8aa3ad]" />
-            <span className="text-xs text-[#0F1819]">Click to upload or drag and drop</span>
-            <span className="text-[11px] text-[#8aa3ad]">PDF, DOCX (Max 10MB)</span>
+            <span className="text-xs text-[#0F1819]">Haz clic para subir o arrastra y suelta</span>
+            <span className="text-[11px] text-[#8aa3ad]">PDF, DOCX (Máx 10MB)</span>
           </div>
         )}
 

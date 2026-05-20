@@ -43,7 +43,7 @@ function ContextMenu({
     >
       <button
         onClick={() => setOpen((v) => !v)}
-        title="Options"
+        title="Opciones"
         className="p-1 text-[#c5d5db] hover:text-[#8aa3ad] rounded transition-colors"
       >
         <GripVertical size={14} />
@@ -55,14 +55,14 @@ function ContextMenu({
             onClick={() => { setOpen(false); onEdit?.(position); }}
             className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#0F1819] hover:bg-[#f4f7f8] transition-colors"
           >
-            Edit
+            Editar
           </button>
           <div className="px-2 pb-2 pt-0.5">
             <button
               onClick={() => { setOpen(false); onDetach?.(position); }}
               className="w-full py-2 text-sm font-bold bg-rose-500 hover:bg-rose-400 text-white rounded-lg transition-colors"
             >
-              detach
+              Desvincular
             </button>
           </div>
         </div>
@@ -115,7 +115,7 @@ export default function OrgNode({
         </span>
         <div className="flex items-center gap-2 mt-3 flex-wrap">
           <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
-            {position.employeeCount} Direct Reports
+            {position.employeeCount} Reportes Directos
           </span>
           <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-semibold px-2.5 py-1 rounded-full">
             {position.status}
@@ -140,7 +140,7 @@ export default function OrgNode({
         >
           <span className="text-sm font-semibold text-[#0F1819] leading-tight">{position.name}</span>
           <span className="text-[11px] text-[#8aa3ad] mt-0.5">
-            {position.department} • {position.employeeCount} Count
+            {position.department} • {position.employeeCount} Personas
           </span>
         </button>
         <div className="absolute top-2 right-1.5">
@@ -172,12 +172,12 @@ export default function OrgNode({
         </div>
         <span className="text-[#0F1819] font-semibold text-sm leading-tight">{position.name}</span>
         <span className="text-[9px] font-semibold tracking-widest uppercase text-[#8aa3ad] mt-1">
-          REPORTS TO:{" "}
+          REPORTA A:{" "}
           {position.superiorName
-            ? position.superiorName.toUpperCase().replace("DEPARTMENT ", "DEPT. ")
+            ? position.superiorName.toUpperCase().replace("DEPARTAMENTO ", "DEPTO. ")
             : "—"}
         </span>
-        <span className="text-[11px] text-[#8aa3ad] mt-2">{position.employeeCount} Employees</span>
+        <span className="text-[11px] text-[#8aa3ad] mt-2">{position.employeeCount} Empleados</span>
       </button>
       <div className="absolute top-3 right-2.5">
         <ContextMenu position={position} onEdit={onEdit} onDetach={onDetach} />

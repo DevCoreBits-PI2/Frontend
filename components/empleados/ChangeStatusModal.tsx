@@ -167,7 +167,7 @@ export default function ChangeStatusModal({
           <button
             onClick={handleConfirmar}
             disabled={!cambioRealizado || cargando}
-            className="px-4 py-2 text-sm font-semibold text-white bg-[#203D47] hover:bg-[#1E333A] rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-400 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {cargando ? "Aplicando..." : "Confirmar Cambio"}
           </button>

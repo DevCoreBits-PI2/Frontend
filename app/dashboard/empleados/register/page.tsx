@@ -73,11 +73,11 @@ const Page = () => {
       <div className="px-8 py-6 bg-white border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-[#8aa3ad]">Dashboard</span>
+            <span className="text-[#8aa3ad]">Panel</span>
             <span className="text-[#8aa3ad]">/</span>
-            <span className="text-[#8aa3ad]">Employee Directory</span>
+            <span className="text-[#8aa3ad]">Directorio de Empleados</span>
             <span className="text-[#8aa3ad]">/</span>
-            <span className="text-[#203D47] font-semibold">Register Employee</span>
+            <span className="text-[#203D47] font-semibold">Registrar Empleado</span>
           </div>
         </div>
 
@@ -88,7 +88,7 @@ const Page = () => {
           >
             ×
           </button>
-          <h1 className="text-2xl font-bold text-[#203D47]">Register New Employee</h1>
+          <h1 className="text-2xl font-bold text-[#203D47]">Registrar Nuevo Empleado</h1>
         </div>
       </div>
 
@@ -119,7 +119,7 @@ const Page = () => {
                 : "border-gray-300 text-[#203D47] hover:bg-gray-50"
             }`}
           >
-            ← Back to Edit
+            ← Volver a Editar
           </button>
 
           <div className="flex gap-3">
@@ -127,13 +127,13 @@ const Page = () => {
               onClick={() => router.push('/dashboard/empleados')}
               className="px-6 py-2 border border-gray-300 rounded text-sm font-semibold text-[#203D47] hover:bg-gray-50 transition"
             >
-              Cancel
+              Cancelar
             </button>
             <button
               onClick={next}
               className="px-6 py-2 bg-[#2ECC71] text-white rounded text-sm font-semibold hover:bg-green-600 transition"
             >
-              {step === 3 ? "Confirm Registration" : "Next →"}
+              {step === 3 ? "Confirmar Registro" : "Siguiente →"}
             </button>
           </div>
         </div>

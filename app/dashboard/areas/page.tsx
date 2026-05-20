@@ -6,13 +6,13 @@ import AreasTable from "@/components/areas/AreasTable";
 import NewAreaModal from "@/components/areas/NewAreaModal";
 import EditAreaModal from "@/components/areas/EditAreaModal";
 import DeleteAreaModal from "@/components/areas/DeleteAreaModal";
-import Toast from "@/components/areas/Toast";
+import ToastNotification from "@/components/ToastNotification";
 import ViewAreaModal from "@/components/areas/ViewAreaModal";
 import { ChevronRight, Plus } from "lucide-react";
 
 interface ToastInfo {
-  mensaje: string;
-  tipo: "exito" | "error";
+  title: string;
+  message: string;
 }
 
 export default function PaginaAreas() {
@@ -27,8 +27,8 @@ export default function PaginaAreas() {
   const [areaAEditar, setAreaAEditar] = useState<Area | null>(null);
   const [areaAEliminar, setAreaAEliminar] = useState<Area | null>(null);
 
-  const mostrarToast = (mensaje: string, tipo: "exito" | "error") => {
-    setToast({ mensaje, tipo });
+  const mostrarToast = (title: string, message: string) => {
+    setToast({ title, message });
   };
 
   const cargarAreas = useCallback(async () => {
@@ -120,7 +120,7 @@ export default function PaginaAreas() {
           onCreada={async () => {
             setMostrarCrear(false);
             await cargarAreas();
-            mostrarToast("Area creada con exito", "exito");
+            mostrarToast("Área creada con éxito", "La nueva área fue registrada correctamente.");
           }}
         />
       )}
@@ -134,7 +134,7 @@ export default function PaginaAreas() {
           onEditada={async () => {
             setAreaAEditar(null);
             await cargarAreas();
-            mostrarToast("Area editada con exito", "exito");
+            mostrarToast("Área editada con éxito", "Los cambios fueron guardados.");
           }}
         />
       )}
@@ -147,19 +147,18 @@ export default function PaginaAreas() {
           onEliminada={async () => {
             setAreaAEliminar(null);
             await cargarAreas();
-            mostrarToast("Area eliminada con exito", "exito");
+            mostrarToast("Área eliminada con éxito", "El área fue eliminada del sistema.");
           }}
         />
       )}
 
       {/* Toast de notificacion */}
-      {toast && (
-        <Toast
-          mensaje={toast.mensaje}
-          tipo={toast.tipo}
-          onCerrar={() => setToast(null)}
-        />
-      )}
+      <ToastNotification
+        isVisible={!!toast}
+        onClose={() => setToast(null)}
+        title={toast?.title}
+        message={toast?.message}
+      />
     </div>
   );
 }

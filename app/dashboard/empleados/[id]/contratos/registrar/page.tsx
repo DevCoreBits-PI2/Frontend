@@ -106,24 +106,24 @@ export default function PaginaRegistrarContrato() {
             href="/dashboard"
             className="hover:text-[#203D47] cursor-pointer transition-colors"
           >
-            Dashboard
+            Panel
           </Link>
           <ChevronRight size={12} className="text-[#c5d5db]" />
           <Link
             href="/dashboard/empleados"
             className="hover:text-[#203D47] cursor-pointer transition-colors"
           >
-            Employee Directory
+            Directorio de Empleados
           </Link>
           <ChevronRight size={12} className="text-[#c5d5db]" />
           <Link
             href={`/dashboard/empleados/${empleadoId}/contratos`}
             className="hover:text-[#203D47] cursor-pointer transition-colors"
           >
-            Contracts
+            Contratos
           </Link>
           <ChevronRight size={12} className="text-[#c5d5db]" />
-          <span className="text-[#0F1819] font-semibold">Register Contract</span>
+          <span className="text-[#0F1819] font-semibold">Registrar Contrato</span>
         </nav>
       </header>
 
@@ -148,9 +148,9 @@ export default function PaginaRegistrarContrato() {
             <>
               {/* Titulo */}
               <div className="mb-6">
-                <h1 className="text-xl font-bold text-[#0F1819]">Register Contract</h1>
+                <h1 className="text-xl font-bold text-[#0F1819]">Registrar Contrato</h1>
                 <p className="text-sm text-[#8aa3ad] mt-0.5">
-                  Create a new employment legal agreement for{" "}
+                  Crear un nuevo acuerdo legal de empleo para{" "}
                   <span className="text-[#0F1819] font-medium">
                     {empleado.nombre} {empleado.apellidos}
                   </span>
@@ -201,7 +201,7 @@ export default function PaginaRegistrarContrato() {
             href={`/dashboard/empleados/${empleadoId}/contratos`}
             className="text-sm font-medium text-[#576975] hover:text-[#0F1819] transition-colors px-4 py-2"
           >
-            Cancel
+            Cancelar
           </Link>
           <button
             type="button"
@@ -209,7 +209,7 @@ export default function PaginaRegistrarContrato() {
             disabled={!formularioValido || guardando}
             className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-200 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
           >
-            {guardando ? "Saving..." : "Save Contract"}
+            {guardando ? "Guardando..." : "Guardar Contrato"}
           </button>
         </footer>
       )}

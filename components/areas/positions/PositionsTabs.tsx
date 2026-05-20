@@ -8,9 +8,9 @@ export default function PositionsTabs({
   onTabChange,
 }: PositionsTabsProps) {
   const tabs: { id: "All" | "Hierarchy" | "Archived"; label: string }[] = [
-    { id: "All", label: "All Positions" },
-    { id: "Hierarchy", label: "Hierarchy management" },
-    { id: "Archived", label: "Archived" },
+    { id: "All", label: "Todas las Posiciones" },
+    { id: "Hierarchy", label: "Gestión de Jerarquía" },
+    { id: "Archived", label: "Archivadas" },
   ];
 
   return (
