@@ -60,6 +60,48 @@ function StatusToggle({ estado }: { estado: EstadoEmpleado }) {
 
 type TabActiva = "trayectoria" | "contratos" | "desempeño";
 
+interface TimelineEntry {
+  fecha: string;
+  titulo: string;
+  area: string;
+  descripcion: string;
+  icon: string;
+  badge?: string;
+}
+
+const TIMELINE_INICIAL: TimelineEntry[] = [
+  {
+    fecha: "ENE 2024",
+    titulo: "Ascenso a Arquitecto Senior",
+    area: "CENTRO DE INGENIERÍA",
+    descripcion:
+      "Transición a rol de liderazgo supervisando proyectos de modernización de infraestructura cloud en regiones de Norteamérica.",
+    icon: "●",
+  },
+  {
+    fecha: "JUN 2021",
+    titulo: "Traslado a División Cloud",
+    area: "INFRAESTRUCTURA ESTRATÉGICA",
+    descripcion:
+      "Movimiento departamental alineado con la transición corporativa hacia arquitectura serverless.",
+    icon: "◆",
+  },
+  {
+    fecha: "MAR 2019",
+    titulo: "Ingreso como Desarrollador Junior",
+    area: "PLATAFORMAS CORE",
+    descripcion:
+      "Incorporación al programa de desarrollo para graduados enfocado en mantenimiento de sistemas legados.",
+    icon: "■",
+  },
+];
+
+function formatFechaTimeline(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", year: "numeric" }).toUpperCase();
+}
+
 export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Props) {
   const [tabActiva, setTabActiva] = useState<TabActiva>("trayectoria");
   const [menuAbierto, setMenuAbierto] = useState(false);
@@ -67,6 +109,7 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
   const [modalCambioAbierto, setModalCambioAbierto] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMsg, setToastMsg] = useState({ title: "", message: "" });
+  const [timeline, setTimeline] = useState<TimelineEntry[]>(TIMELINE_INICIAL);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Local editable state to reflect edits performed via modal
@@ -250,38 +293,13 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                   </button>
                 </div>
                 <div className="space-y-8">
-                  {[
-                    {
-                      fecha: "ENE 2024",
-                      titulo: "Ascenso a Arquitecto Senior",
-                      area: "CENTRO DE INGENIERÍA",
-                      descripcion:
-                        "Transición a rol de liderazgo supervisando proyectos de modernización de infraestructura cloud en regiones de Norteamérica.",
-                      icon: "●",
-                    },
-                    {
-                      fecha: "JUN 2021",
-                      titulo: "Traslado a División Cloud",
-                      area: "INFRAESTRUCTURA ESTRATÉGICA",
-                      descripcion:
-                        "Movimiento departamental alineado con la transición corporativa hacia arquitectura serverless.",
-                      icon: "◆",
-                    },
-                    {
-                      fecha: "MAR 2019",
-                      titulo: "Ingreso como Desarrollador Junior",
-                      area: "PLATAFORMAS CORE",
-                      descripcion:
-                        "Incorporación al programa de desarrollo para graduados enfocado en mantenimiento de sistemas legados.",
-                      icon: "■",
-                    },
-                  ].map((item, idx) => (
+                  {timeline.map((item, idx) => (
                     <div key={idx} className="flex gap-6">
                       <div className="flex shrink-0 flex-col items-center">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#BDD5EA] text-sm font-bold text-[#203D47] shadow-sm">
                           {item.icon}
                         </div>
-                        {idx < 2 && (
+                        {idx < timeline.length - 1 && (
                           <div className="mt-4 h-24 w-0.5 bg-[#d1dde2]" />
                         )}
                       </div>
@@ -295,6 +313,11 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                         <p className="mt-2 text-sm leading-relaxed text-[#576975]">
                           {item.descripcion}
                         </p>
+                        {item.badge && (
+                          <span className="mt-2 inline-block text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-md px-2 py-0.5">
+                            {item.badge}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -391,8 +414,50 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
       <RegisterWorkChangeModal
         isOpen={modalCambioAbierto}
         onCerrar={() => setModalCambioAbierto(false)}
-        onGuardar={async (_datos) => {
+        salarioActual={4_320_000}
+        onGuardar={async (datos) => {
           setModalCambioAbierto(false);
+
+          if (datos.tipo === "cambio_salarial") {
+            const signo = datos.tipoCambioSalarial === "aumento" ? "+" : "-";
+            const badge = `SALARY CHANGE: ${signo}${datos.porcentajeAjuste}%`;
+            setTimeline((prev) => [
+              {
+                fecha: formatFechaTimeline(datos.fechaEfectiva),
+                titulo: datos.tipoCambioSalarial === "aumento" ? "Salary Increase" : "Salary Decrease",
+                area: "SALARY MODIFICATION",
+                descripcion: datos.justificacion,
+                icon: datos.tipoCambioSalarial === "aumento" ? "↑" : "↓",
+                badge,
+              },
+              ...prev,
+            ]);
+            setToastMsg({
+              title: "Employee salary adjustment approved.",
+              message: `Salary ${datos.tipoCambioSalarial === "aumento" ? "increased" : "decreased"} by ${datos.porcentajeAjuste}% effective ${formatFechaTimeline(datos.fechaEfectiva)}.`,
+            });
+          } else {
+            const LABELS: Record<string, string> = {
+              traslado: "Transfer registered",
+              ascenso: "Promotion registered",
+              modificacion_contractual: "Contract modification registered",
+            };
+            setTimeline((prev) => [
+              {
+                fecha: formatFechaTimeline(datos.fechaEfectiva),
+                titulo: LABELS[datos.tipo] ?? "Work change registered",
+                area: datos.areaDestino ? datos.areaDestino.toUpperCase() : "GENERAL",
+                descripcion: datos.justificacion,
+                icon: datos.tipo === "ascenso" ? "▲" : datos.tipo === "traslado" ? "⇄" : "◉",
+              },
+              ...prev,
+            ]);
+            setToastMsg({
+              title: "Work change registered successfully.",
+              message: "The change has been added to the employee's labor history.",
+            });
+          }
+
           setToastVisible(true);
         }}
       />
