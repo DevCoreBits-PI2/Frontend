@@ -7,7 +7,8 @@
 export type AreaStatus = "active" | "inactive";
 
 export interface AreaDto {
-  id: number;
+  id?: number;
+  id_area?: number;
   name: string;
   description: string;
   id_administrator: number;

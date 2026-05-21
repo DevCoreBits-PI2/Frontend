@@ -14,8 +14,9 @@ import type { EmployeeDto, UpdateProfilePayload } from "@/types/api/employee";
 import type { UserProfile } from "@/types/funcionario";
 
 function empleadoDtoToUserProfile(dto: EmployeeDto): UserProfile {
+  const id = dto.id ?? dto.id_employee ?? 0;
   return {
-    idFuncionario: dto.id,
+    idFuncionario: id,
     nombre: dto.first_name ?? "",
     apellidos: dto.last_name ?? "",
     cargo: dto.position?.name ?? "",

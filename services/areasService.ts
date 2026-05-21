@@ -38,18 +38,19 @@ function colorPara(id: number): string {
 }
 
 function dtoToArea(dto: AreaDto): Area {
+  const id = dto.id ?? dto.id_area ?? 0;
   const posiciones =
     dto.positions_count ??
     dto._count?.positions ??
     0;
 
   return {
-    id: String(dto.id),
+    id: String(id),
     nombre: dto.name,
     descripcion: dto.description,
     posiciones,
     estado: dto.status === "active" ? "ACTIVO" : "INACTIVO",
-    color: colorPara(dto.id),
+    color: colorPara(id),
     icono: ICONO_POR_DEFECTO,
     idAdministrator: dto.id_administrator,
   };

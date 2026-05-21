@@ -60,10 +60,10 @@ export async function obtenerEstadisticasContratos(): Promise<EstadisticasContra
   try {
     const stats = await apiGet<ContractStats>(CONTRACTS.stats);
     return {
-      activos: stats.activos ?? stats.valid ?? 0,
-      proxAVencer: stats.proxAVencer ?? stats.expiring_soon ?? 0,
-      renovados: stats.renovados ?? 0,
-      vencidosAnulados: stats.vencidosAnulados ?? stats.expired ?? 0,
+      activos: stats.activos ?? stats.active ?? stats.valid ?? 0,
+      proxAVencer: stats.proxAVencer ?? stats.expiring_soon ?? stats.expiringSoon ?? 0,
+      renovados: stats.renovados ?? stats.renewed ?? 0,
+      vencidosAnulados: stats.vencidosAnulados ?? stats.expiredOrAnnulled ?? stats.expired ?? 0,
     };
   } catch (err) {
     if (err instanceof ForbiddenError) {

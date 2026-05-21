@@ -10,7 +10,8 @@ export type EmployeeStatus =
   | "invited";
 
 export interface EmployeeDto {
-  id: number;
+  id?: number;
+  id_employee?: number;
   first_name: string;
   last_name: string;
   email: string;
@@ -27,13 +28,14 @@ export interface EmployeeDto {
   updated_at?: string;
   // Algunas respuestas pueden incluir relaciones expandidas:
   position?: {
-    id: number;
+    id?: number;
+    id_position?: number;
     name: string;
     id_area?: number;
     area?: { id: number; name: string };
   };
   area?: { id: number; name: string };
-  manager?: { id: number; first_name?: string; last_name?: string } | null;
+  manager?: { id?: number; id_employee?: number; first_name?: string; last_name?: string } | null;
 }
 
 export interface InviteUserPayload {
@@ -66,8 +68,10 @@ export interface ScanQrPayload {
 }
 
 export interface QrTokenResponse {
-  token: string;
+  token?: string;
+  qrToken?: string;
   expires_at?: string;
+  expiresAt?: string;
 }
 
 export interface QrEmployeeView {

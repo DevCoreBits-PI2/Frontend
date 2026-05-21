@@ -31,14 +31,17 @@ function flattenTree(
   if (!nodes) return out;
   for (const node of nodes) {
     const childNodes = node.children ?? [];
+    const id = node.id ?? node.id_position ?? 0;
+    const area = node.area ?? node.areas;
+    const employeeCount = node._count?.employees ?? node.employees?.length ?? (node.employee ? 1 : 0);
     out.push({
-      id: String(node.id),
+      id: String(id),
       name: node.name,
-      department: node.area?.name ?? "",
+      department: area?.name ?? "",
       level,
       parentId: node.parent_position_id != null ? String(node.parent_position_id) : null,
       superiorName: parentName,
-      employeeCount: node._count?.employees ?? node.employees?.length ?? 0,
+      employeeCount,
       status: node.status === "active" ? "Active" : "Inactive",
       directReportNames: childNodes.map((c) => c.name),
       iconType: pickIcon(node.name),
@@ -48,11 +51,32 @@ function flattenTree(
   return out;
 }
 
+function buildFlatTree(nodes: PositionTreeNode[]): PositionTreeNode[] {
+  const byId = new Map<number, PositionTreeNode & { children: PositionTreeNode[] }>();
+  for (const node of nodes) {
+    const id = node.id ?? node.id_position;
+    if (!id) continue;
+    byId.set(id, { ...node, children: [] });
+  }
+
+  const roots: PositionTreeNode[] = [];
+  byId.forEach((node) => {
+    if (node.parent_position_id && byId.has(node.parent_position_id)) {
+      byId.get(node.parent_position_id)?.children?.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  return roots;
+}
+
 let cachedPositions: Position[] = [];
 
 export const getPositions = async (): Promise<Position[]> => {
   const tree = await obtenerArbolPosiciones();
-  cachedPositions = flattenTree(tree);
+  const normalizedTree = tree.some((node) => node.children?.length) ? tree : buildFlatTree(tree);
+  cachedPositions = flattenTree(normalizedTree);
   return cachedPositions;
 };
 

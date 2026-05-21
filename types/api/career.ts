@@ -10,13 +10,15 @@ export type CareerTypeChange =
   | "evaluation";
 
 export interface CareerHistoryDto {
-  id: number;
+  id?: number;
+  id_record?: number;
   description: string;
   event_date: string;
   type: CareerTypeChange;
   id_employee: number;
   id_evaluation?: number | null;
   created_at?: string;
+  performance_evaluations?: PerformanceEvaluationDto | null;
 }
 
 export interface CreateCareerHistoryPayload {
@@ -30,7 +32,8 @@ export interface CreateCareerHistoryPayload {
 export type UpdateCareerHistoryPayload = Partial<CreateCareerHistoryPayload>;
 
 export interface PerformanceEvaluationDto {
-  id: number;
+  id?: number;
+  id_evaluation?: number;
   id_director: number;
   id_employee?: number;
   observations?: string;

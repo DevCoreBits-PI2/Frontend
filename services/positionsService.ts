@@ -63,10 +63,14 @@ function iniciales(nombre: string): string {
 }
 
 function dtoToPosition(dto: PositionDto): Position {
-  const empleados = (dto.employees ?? []).map((e) => {
+  const id = dto.id ?? dto.id_position ?? 0;
+  const area = dto.area ?? dto.areas;
+  const parent = dto.parent_position ?? dto.positions;
+  const rawEmployees = dto.employees ?? (dto.employee ? [dto.employee] : []);
+  const empleados = rawEmployees.map((e) => {
     const nombre = `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || `Empleado ${e.id}`;
     return {
-      id: String(e.id),
+      id: String(e.id ?? e.id_employee ?? ""),
       nombre,
       foto: e.photo_url,
       iniciales: iniciales(nombre),
@@ -74,16 +78,16 @@ function dtoToPosition(dto: PositionDto): Position {
   });
 
   return {
-    id: `POS-${String(dto.id).padStart(5, "0")}`,
-    rawId: dto.id,
+    id: `POS-${String(id).padStart(5, "0")}`,
+    rawId: id,
     nombre: dto.name,
     empleados,
-    posicionSuperior: dto.parent_position?.name ?? null,
-    posicionSuperiorId: dto.parent_position?.id ?? dto.parent_position_id ?? null,
+    posicionSuperior: parent?.name ?? null,
+    posicionSuperiorId: parent?.id ?? parent?.id_position ?? dto.parent_position_id ?? null,
     estado: dto.status === "active" ? "Active" : "Drafting",
     areaId: `area-${dto.id_area}`,
     areaIdNumber: dto.id_area,
-    areaNombre: dto.area?.name ?? "",
+    areaNombre: area?.name ?? "",
     vacancies: dto.vacancies ?? 0,
     baseSalary: dto.base_salary,
     description: dto.description ?? "",

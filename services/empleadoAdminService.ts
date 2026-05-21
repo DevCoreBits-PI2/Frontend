@@ -28,7 +28,7 @@ export async function cambiarEstadoEmpleado(
 
   // 2) Actualizar estado.
   const updated = await apiPatch<EmployeeDto>(EMPLOYEES.updateEmployee(id), {
-    id_employee: actual.id,
+    id_employee: actual.id ?? actual.id_employee ?? Number(id),
     status: statusToBackend(nuevoEstado),
     id_position: actual.id_position,
     id_manager: actual.id_manager,
@@ -40,7 +40,7 @@ export async function cambiarEstadoEmpleado(
       description: motivo || `Cambio de estado a ${nuevoEstado}`,
       event_date: new Date().toISOString().slice(0, 10),
       type: "contract_modification",
-      id_employee: actual.id,
+      id_employee: actual.id ?? actual.id_employee ?? Number(id),
     });
   } catch (err) {
     console.warn("[empleadoAdmin] no se pudo registrar el evento en historial:", err);

@@ -60,12 +60,17 @@ const BACKEND_TO_TIPO: Record<ContractType, TipoContrato> = {
 };
 
 function deriveEstado(dto: ContractDto): { estado: EstadoContrato; validez: ValidezContrato } {
-  // El backend solo expone status valid|expired; deducimos RENOVADO/ANULADO si vienen explícitos.
-  // Si tiene end_date pasada → EXPIRADO.
+  const status = dto.contract_status ?? dto.status;
   const today = new Date();
   const end = dto.end_date ? new Date(dto.end_date) : null;
 
-  if (dto.contract_status === "expired") {
+  if (status === "annulled") {
+    return { estado: "ANULADO", validez: "VOIDED" };
+  }
+  if (status === "renewed") {
+    return { estado: "RENOVADO", validez: "COMPLETED" };
+  }
+  if (status === "expired") {
     return { estado: "EXPIRADO", validez: "EXPIRED" };
   }
   if (end && end.getTime() < today.getTime()) {
@@ -75,10 +80,11 @@ function deriveEstado(dto: ContractDto): { estado: EstadoContrato; validez: Vali
 }
 
 function dtoToContrato(dto: ContractDto): Contrato {
+  const id = dto.id ?? dto.id_contract ?? 0;
   const { estado, validez } = deriveEstado(dto);
   return {
-    id: `c-${dto.id}`,
-    rawId: dto.id,
+    id: `c-${id}`,
+    rawId: id,
     idEmpleado: String(dto.id_employee),
     idManager: dto.id_manager,
     tipo: BACKEND_TO_TIPO[dto.contract_type] ?? "FIJO",
@@ -86,7 +92,7 @@ function dtoToContrato(dto: ContractDto): Contrato {
     fechaFin: dto.end_date ? dto.end_date.slice(0, 10) : null,
     salarioBase: 0,                // El backend actual no expone salario en el contrato.
     notas: dto.conditions ?? "",
-    pdfUrl: dto.pdf_url ?? null,
+    pdfUrl: dto.pdf_url ?? dto.pdf_document ?? null,
     estado,
     validez,
     creadoEn: dto.created_at?.slice(0, 10) ?? dto.start_date?.slice(0, 10) ?? "",
@@ -203,7 +209,7 @@ export const eliminarContrato = async (id: string): Promise<void> => {
 export const anularContrato = async (id: string): Promise<Contrato> => {
   const realId = id.startsWith("c-") ? Number(id.slice(2)) : Number(id);
   const dto = await apiPatch<ContractDto>(CONTRACTS.update(realId), {
-    contractStatus: "expired",
+    contractStatus: "annulled",
   });
   return dtoToContrato(dto);
 };

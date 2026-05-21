@@ -90,7 +90,7 @@ export async function obtenerAlertasContratos(): Promise<AlertaContrato[]> {
     const contratos = normalizePaginated<ContractDto>(raw);
 
     return contratos
-      .filter((c) => c.end_date && c.contract_status !== "expired")
+      .filter((c) => c.end_date && (c.contract_status ?? c.status) !== "expired")
       .map<AlertaContrato | null>((c) => {
         const dias = diasHasta(c.end_date);
         if (dias < 0 || dias > 30) return null;
@@ -98,9 +98,9 @@ export async function obtenerAlertasContratos(): Promise<AlertaContrato[]> {
           ? `${c.employee.first_name ?? ""} ${c.employee.last_name ?? ""}`.trim()
           : `Empleado #${c.id_employee}`;
         return {
-          idContrato: c.id,
+          idContrato: c.id ?? c.id_contract ?? 0,
           nombre: employeeName,
-          codigoContrato: `CN-${String(c.id).padStart(4, "0")}`,
+          codigoContrato: `CN-${String(c.id ?? c.id_contract ?? 0).padStart(4, "0")}`,
           departamento: "",
           diasRestantes: dias,
           condiciones: c.conditions,

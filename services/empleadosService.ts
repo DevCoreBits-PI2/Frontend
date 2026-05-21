@@ -16,7 +16,7 @@
 
 import { apiGet, apiPatch, apiPost } from "@/lib/api/client";
 import { EMPLOYEES } from "@/lib/api/endpoints";
-import { PERFORMANCE } from "@/lib/api/endpoints";
+import { CAREER_HISTORY, PERFORMANCE } from "@/lib/api/endpoints";
 import { normalizePaginated } from "@/types/api/common";
 import type {
   EmployeeDto,
@@ -88,10 +88,11 @@ export function statusToBackend(s: EstadoEmpleado): EmployeeStatus {
 }
 
 export function dtoToEmpleado(dto: EmployeeDto): Empleado {
+  const id = dto.id ?? dto.id_employee ?? 0;
   return {
-    id: String(dto.id),
-    rawId: dto.id,
-    codigoEmpleado: `EMP-${dto.code ?? dto.id}`,
+    id: String(id),
+    rawId: id,
+    codigoEmpleado: `EMP-${dto.code ?? id}`,
     nombre: dto.first_name ?? "",
     apellidos: dto.last_name ?? "",
     cargo: dto.position?.name ?? "",
@@ -181,14 +182,9 @@ const FIELD_TO_LABEL: Record<string, string> = {
   reliability: "Confianza",
 };
 
-function evaluationToPayload(
-  empleadoIdNum: number,
-  ev: Evaluation,
-  directorId: number,
-): CreatePerformanceEvaluationPayload {
+function evaluationToPayload(ev: Evaluation, directorId: number): CreatePerformanceEvaluationPayload {
   const payload: CreatePerformanceEvaluationPayload = {
     id_director: directorId,
-    id_employee: empleadoIdNum,
     observations: ev.observations,
     evaluation_date: ev.date,
   };
@@ -201,14 +197,16 @@ function evaluationToPayload(
   return payload;
 }
 
-function dtoToEvaluation(dto: PerformanceEvaluationDto): Evaluation {
+function dtoToEvaluation(dto: PerformanceEvaluationDto & { performance_evaluations?: PerformanceEvaluationDto | null }): Evaluation {
+  const evaluation = dto.performance_evaluations ?? dto;
+  const id = evaluation.id ?? evaluation.id_evaluation ?? dto.id ?? dto.id_evaluation ?? 0;
   const competencies: EvaluationCompetency[] = [];
   const map = {
-    communication: dto.communication,
-    technical_proficiency: dto.technical_proficiency,
-    leadership_influence: dto.leadership_influence,
-    innovation: dto.innovation,
-    reliability: dto.reliability,
+    communication: evaluation.communication,
+    technical_proficiency: evaluation.technical_proficiency,
+    leadership_influence: evaluation.leadership_influence,
+    innovation: evaluation.innovation,
+    reliability: evaluation.reliability,
   } as const;
   let sum = 0;
   let count = 0;
@@ -221,13 +219,13 @@ function dtoToEvaluation(dto: PerformanceEvaluationDto): Evaluation {
   }
   const avg = count > 0 ? sum / count : 0;
   return {
-    id: String(dto.id),
+    id: String(id),
     title: "Evaluación de desempeño",
-    reviewer: String(dto.id_director),
-    date: dto.evaluation_date,
+    reviewer: String(evaluation.id_director),
+    date: evaluation.evaluation_date,
     score: Number(avg.toFixed(2)),
     competencies,
-    observations: dto.observations,
+    observations: evaluation.observations,
   };
 }
 
@@ -236,9 +234,18 @@ export const guardarEvaluacion = async (
   evaluation: Evaluation,
   directorId: number,
 ): Promise<Evaluation> => {
-  const empleadoIdNum = Number(empleadoId);
-  const payload = evaluationToPayload(empleadoIdNum, evaluation, directorId);
+  const payload = evaluationToPayload(evaluation, directorId);
   const dto = await apiPost<PerformanceEvaluationDto>(PERFORMANCE.create, payload);
+  const evaluationId = dto.id ?? dto.id_evaluation;
+  if (evaluationId) {
+    await apiPost(CAREER_HISTORY.create, {
+      description: evaluation.observations || "Evaluación de desempeño registrada",
+      event_date: evaluation.date,
+      type: "evaluation",
+      id_employee: Number(empleadoId),
+      id_evaluation: evaluationId,
+    });
+  }
   return dtoToEvaluation(dto);
 };
 
@@ -247,7 +254,7 @@ export const obtenerEvaluacionesEmpleado = async (
 ): Promise<Evaluation[]> => {
   try {
     const data = await apiGet<unknown>(PERFORMANCE.byEmployee(empleadoId));
-    return normalizePaginated<PerformanceEvaluationDto>(data).map(dtoToEvaluation);
+    return normalizePaginated<PerformanceEvaluationDto & { performance_evaluations?: PerformanceEvaluationDto | null }>(data).map(dtoToEvaluation);
   } catch {
     return [];
   }

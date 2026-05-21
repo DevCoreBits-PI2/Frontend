@@ -133,7 +133,7 @@ export const enviarRegistroEmpleado = async (
 
   try {
     const dto = await apiPost<EmployeeDto>(EMPLOYEES.invite, body);
-    return { success: true, employeeId: String(dto.id), payload };
+    return { success: true, employeeId: String(dto.id ?? dto.id_employee ?? ""), payload };
   } catch (err) {
     const mensaje = err instanceof ApiError ? err.message : "Error al invitar empleado";
     return { success: false, errorCode: "BACKEND_ERROR", errorMessage: mensaje };

@@ -11,17 +11,21 @@ export type ContractType =
   | "service_provision_contract";
 
 export type ContractStatus = "valid" | "expired";
+export type BackendContractStatus = ContractStatus | "renewed" | "annulled";
 
 export interface ContractDto {
-  id: number;
+  id?: number;
+  id_contract?: number;
   conditions: string;
   contract_type: ContractType;
-  contract_status: ContractStatus;
+  contract_status?: BackendContractStatus;
+  status?: BackendContractStatus;
   start_date: string;
   end_date: string;
   id_employee: number;
   id_manager: number;
   pdf_url?: string | null;
+  pdf_document?: string | null;
   created_at?: string;
   updated_at?: string;
   // Relaciones a veces expandidas:
@@ -66,4 +70,9 @@ export interface ContractStats {
   valid?: number;
   expired?: number;
   expiring_soon?: number;
+  active?: number;
+  expiringSoon?: number;
+  renewed?: number;
+  annulled?: number;
+  expiredOrAnnulled?: number;
 }
