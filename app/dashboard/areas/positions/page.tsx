@@ -23,7 +23,9 @@ import {
   editarPosicion,
   eliminarPosicion,
   type Position,
+  type NuevaPosicionInput,
 } from "@/services/positionsService";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES & INTERFACES
@@ -124,7 +126,7 @@ function AvatarStack({ empleados, maxDisplay = 3 }: AvatarStackProps) {
 interface NewPositionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (position: Omit<Position, "id">) => Promise<void>;
+  onSave: (position: NuevaPosicionInput) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -144,10 +146,8 @@ function NewPositionModal({
 
     await onSave({
       nombre,
-      posicionSuperior: posicionSuperior || null,
       estado,
       areaId,
-      empleados: [],
     });
 
     setNombre("");
@@ -261,6 +261,7 @@ function NewPositionModal({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function PositionsPage() {
+  const { authUser } = useAuth();
   const [posicionAVer, setPosicionAVer] = useState<Position | null>(null); //Nuevos estados
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null); //Nuevos estados
   const [positions, setPositions] = useState<Position[]>([]);
@@ -321,10 +322,20 @@ export default function PositionsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleNewPosition = async (positionData: Omit<Position, "id">) => {
+  const handleNewPosition = async (positionData: NuevaPosicionInput) => {
+    // El backend exige `id_administrator` (FK a tabla administrators).
+    // Si es admin → adminId (de GET /api/admin/:id). Si es HT empleado → employeeId.
+    const idAdministrator = authUser?.adminId ?? authUser?.employeeId ?? null;
+    if (!idAdministrator) {
+      setToast({
+        title: "Error",
+        message: "Tu sesión no tiene administrador asociado para crear posiciones.",
+      });
+      return;
+    }
     try {
       setModalLoading(true);
-      await crearPosicion(positionData);
+      await crearPosicion(positionData, idAdministrator);
       setShowNewModal(false);
       setToast({
         title: "Éxito",
@@ -332,11 +343,9 @@ export default function PositionsPage() {
       });
       await fetchPositions();
     } catch (error) {
+      const msg = error instanceof Error ? error.message : "No se pudo crear la posición";
       console.error("Error creating position:", error);
-      setToast({
-        title: "Error",
-        message: "No se pudo crear la posición",
-      });
+      setToast({ title: "Error", message: msg });
     } finally {
       setModalLoading(false);
     }

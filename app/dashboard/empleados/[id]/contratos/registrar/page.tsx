@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 
+import toast from "react-hot-toast";
 import { Empleado, obtenerEmpleadoPorId } from "@/services/empleadosService";
 import {
   ResultadoValidacion,
@@ -12,6 +13,7 @@ import {
   crearContrato,
   validarContrato,
 } from "@/services/contratosService";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 import EmpleadoInfoCard from "@/components/contratos/EmpleadoInfoCard";
 import ValidationStatusCard from "@/components/contratos/ValidationStatusCard";
@@ -28,6 +30,7 @@ export default function PaginaRegistrarContrato() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const empleadoId = params.id;
+  const { authUser } = useAuth();
 
   const [empleado, setEmpleado] = useState<Empleado | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -79,20 +82,32 @@ export default function PaginaRegistrarContrato() {
 
   const handleGuardar = async () => {
     if (!formularioValido || guardando) return;
+    if (!documento) {
+      toast.error("Debes adjuntar el PDF del contrato.");
+      return;
+    }
+    if (!authUser?.employeeId) {
+      toast.error("Tu sesión no tiene empleado asociado para registrar contratos.");
+      return;
+    }
     setGuardando(true);
     try {
       await crearContrato({
         idEmpleado: empleadoId,
+        idManager: empleado?.managerId ?? authUser.employeeId,
         tipo,
         fechaInicio,
         fechaFin: tipo === "INDEFINIDO" ? null : fechaFin,
         salarioBase: typeof salario === "number" ? salario : 0,
         notas,
-        documentoNombre: documento?.name,
+        archivoPdf: documento,
       });
+      toast.success("Contrato registrado.");
       router.push(`/dashboard/empleados/${empleadoId}/contratos?creado=1`);
     } catch (e) {
-      console.error(e);
+      const msg = e instanceof Error ? e.message : "No se pudo registrar el contrato.";
+      toast.error(msg);
+    } finally {
       setGuardando(false);
     }
   };

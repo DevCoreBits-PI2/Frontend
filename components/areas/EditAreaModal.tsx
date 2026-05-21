@@ -38,6 +38,9 @@ export default function EditAreaModal({ area, todasLasAreas, onCerrar, onEditada
         estado: activo ? "ACTIVO" : "INACTIVO",
       });
       onEditada();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "No se pudo actualizar el área.";
+      console.error(msg);
     } finally {
       setGuardando(false);
     }

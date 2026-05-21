@@ -5,24 +5,72 @@ import { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import EditInfoModal from "@/components/perfil/EditInfoModal";
 import UserProfileCard from "@/components/perfil/UserProfileCard";
-import { obtenerPerfilUsuario, actualizarPerfilUsuario } from "@/services/profileService";
+import {
+  actualizarPerfilUsuario,
+  adminDtoToUserProfile,
+  obtenerPerfilUsuario,
+} from "@/services/profileService";
+import { useAuth } from "@/lib/auth/AuthContext";
 import { UserProfile } from "@/types/funcionario";
 
+interface EditInfoPayload {
+  fullName?: string;
+  emailAddress?: string;
+  phoneNumber?: string;
+}
+
 export default function PerfilUsuarioPage() {
+  const { ready, authUser, adminProfile } = useAuth();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    obtenerPerfilUsuario()
-      .then((perfil) => setUser(perfil))
-      .catch(() => setError("No se pudo cargar el perfil de usuario."))
-      .finally(() => setLoading(false));
-  }, []);
+    if (!ready) return;
 
-  const handleSaveInfo = async (data: any) => {
+    let cancelado = false;
+
+    const cargar = async () => {
+      // Si el usuario es admin (verificado vía GET /api/admin/:id), usamos
+      // ese perfil directamente. Evita pegarle a getMyProfile (employees),
+      // que devolvería 500 porque los admins no están en la tabla employees.
+      if (authUser?.isAdmin && adminProfile) {
+        if (!cancelado) {
+          setUser(adminDtoToUserProfile(adminProfile));
+          setLoading(false);
+        }
+        return;
+      }
+
+      // Empleado regular: usar el endpoint de empleados.
+      try {
+        const perfil = await obtenerPerfilUsuario();
+        if (!cancelado) setUser(perfil);
+      } catch {
+        if (!cancelado) setError("No se pudo cargar el perfil de usuario.");
+      } finally {
+        if (!cancelado) setLoading(false);
+      }
+    };
+
+    cargar();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [ready, authUser?.isAdmin, adminProfile]);
+
+  const handleSaveInfo = async (data: EditInfoPayload) => {
     if (!user) return;
+
+    // Para admins no hay endpoint de update de perfil de admin (PATCH no existe),
+    // así que la edición sólo aplica a empleados. Mostramos la modal igual,
+    // pero el guardado contra el backend sólo corre para empleados.
+    if (authUser?.isAdmin) {
+      setIsModalOpen(false);
+      return;
+    }
 
     const [nombre, ...restoNombre] = data.fullName?.trim().split(/\s+/) ?? [];
     const perfilActualizado: UserProfile = {

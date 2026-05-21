@@ -2,6 +2,8 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import { crearArea } from "@/services/areasService";
+import { useAuth } from "@/lib/auth/AuthContext";
+import toast from "react-hot-toast";
 
 interface NewAreaModalProps {
   onCerrar: () => void;
@@ -9,6 +11,7 @@ interface NewAreaModalProps {
 }
 
 export default function NewAreaModal({ onCerrar, onCreada }: NewAreaModalProps) {
+  const { authUser } = useAuth();
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -24,6 +27,14 @@ export default function NewAreaModal({ onCerrar, onCreada }: NewAreaModalProps) 
 
   const manejarGuardar = async () => {
     if (!validar()) return;
+    // El backend exige `id_administrator` (FK a la tabla `administrators`).
+    // Si el usuario es admin, usamos el adminId resuelto vía GET /api/admin/:id.
+    // Como fallback (HT empleado actuando), usamos su employeeId.
+    const idAdministrator = authUser?.adminId ?? authUser?.employeeId ?? null;
+    if (!idAdministrator) {
+      toast.error("Tu sesión no tiene un administrador asociado para registrar el área.");
+      return;
+    }
     setGuardando(true);
     try {
       await crearArea({
@@ -33,8 +44,12 @@ export default function NewAreaModal({ onCerrar, onCreada }: NewAreaModalProps) 
         estado: "ACTIVO",
         color: "#10B981",
         icono: "default",
+        idAdministrator,
       });
       onCreada();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "No se pudo crear el área.";
+      toast.error(msg);
     } finally {
       setGuardando(false);
     }

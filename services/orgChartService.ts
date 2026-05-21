@@ -1,71 +1,59 @@
-import { Position, PositionTree } from "@/types/orgChart";
+// Servicio de organigrama — integrado con el endpoint público /positions-tree.
 
-const POSITIONS_MOCK: Position[] = [
-  {
-    id: "1",
-    name: "Department Director",
-    department: "Engineering",
-    level: 1,
-    parentId: null,
-    superiorName: undefined,
-    employeeCount: 12,
-    status: "Active",
-    directReportNames: ["Senior Architect", "Cloud Infra Lead"],
-    iconType: "crown",
-  },
-  {
-    id: "2",
-    name: "Senior Architect",
-    department: "Engineering",
-    level: 4,
-    parentId: "1",
-    superiorName: "Department Director",
-    employeeCount: 4,
-    status: "Active",
-    directReportNames: ["Frontend Developer", "Backend Developer", "QA Lead"],
-    iconType: "person",
-  },
-  {
-    id: "3",
-    name: "Cloud Infra Lead",
-    department: "Engineering",
-    level: 3,
-    parentId: "1",
-    superiorName: "Department Director",
-    employeeCount: 2,
-    status: "Active",
-    directReportNames: [],
-    iconType: "cloud",
-  },
-  {
-    id: "4",
-    name: "Frontend Dev",
-    department: "Engineering",
-    level: 5,
-    parentId: "2",
-    superiorName: "Senior Architect",
-    employeeCount: 8,
-    status: "Active",
-    directReportNames: [],
-    iconType: "code",
-  },
-  {
-    id: "5",
-    name: "Backend Dev",
-    department: "Engineering",
-    level: 5,
-    parentId: "2",
-    superiorName: "Senior Architect",
-    employeeCount: 12,
-    status: "Active",
-    directReportNames: [],
-    iconType: "code",
-  },
-];
+import { Position, PositionTree } from "@/types/orgChart";
+import { obtenerArbolPosiciones } from "./positionsService";
+import type { PositionTreeNode } from "@/types/api/position";
+
+const ICON_BY_NAME: Record<string, Position["iconType"]> = {
+  director: "crown",
+  ceo: "crown",
+  lead: "shield",
+  architect: "person",
+  cloud: "cloud",
+  frontend: "code",
+  backend: "code",
+};
+
+function pickIcon(name: string): Position["iconType"] {
+  const lower = name.toLowerCase();
+  for (const key of Object.keys(ICON_BY_NAME)) {
+    if (lower.includes(key)) return ICON_BY_NAME[key];
+  }
+  return "person";
+}
+
+function flattenTree(
+  nodes: PositionTreeNode[] | undefined,
+  out: Position[] = [],
+  parentName?: string,
+  level = 1,
+): Position[] {
+  if (!nodes) return out;
+  for (const node of nodes) {
+    const childNodes = node.children ?? [];
+    out.push({
+      id: String(node.id),
+      name: node.name,
+      department: node.area?.name ?? "",
+      level,
+      parentId: node.parent_position_id != null ? String(node.parent_position_id) : null,
+      superiorName: parentName,
+      employeeCount: node._count?.employees ?? node.employees?.length ?? 0,
+      status: node.status === "active" ? "Active" : "Inactive",
+      directReportNames: childNodes.map((c) => c.name),
+      iconType: pickIcon(node.name),
+    });
+    flattenTree(childNodes, out, node.name, level + 1);
+  }
+  return out;
+}
+
+let cachedPositions: Position[] = [];
 
 export const getPositions = async (): Promise<Position[]> => {
-  await new Promise((r) => setTimeout(r, 400));
-  return POSITIONS_MOCK;
+  const tree = await obtenerArbolPosiciones();
+  cachedPositions = flattenTree(tree);
+  return cachedPositions;
 };
 
 export const buildPositionTree = (positions: Position[]): PositionTree => {
@@ -75,16 +63,16 @@ export const buildPositionTree = (positions: Position[]): PositionTree => {
   let root: PositionTree | null = null;
   map.forEach((node) => {
     if (node.parentId === null) {
-      root = node;
+      // Si hay múltiples raíces, escogemos la primera que aparezca.
+      if (!root) root = node;
     } else {
       const parent = map.get(node.parentId);
       if (parent) parent.children.push(node);
     }
   });
 
-  if (!root) throw new Error("No root position found in hierarchy");
+  if (!root) throw new Error("No se encontró una raíz en la jerarquía de cargos");
   return root;
 };
 
-export const getAllPositionNames = (): string[] =>
-  POSITIONS_MOCK.map((p) => p.name);
+export const getAllPositionNames = (): string[] => cachedPositions.map((p) => p.name);

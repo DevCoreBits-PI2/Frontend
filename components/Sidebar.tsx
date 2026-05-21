@@ -12,11 +12,16 @@ import {
   LogOut,
 } from "lucide-react";
 
-import { logOutUser } from "@/services/logOut";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { canManageHumanTalent, PositionId } from "@/lib/auth/roles";
 
 interface SubItem {
   etiqueta: string;
   href: string;
+  // Subitem oculto si el rol no lo cumple. Usa la misma forma que NavItem.
+  requireHumanTalent?: boolean;
+  requireAdmin?: boolean;
+  positions?: PositionId[];
 }
 
 interface NavItem {
@@ -24,35 +29,58 @@ interface NavItem {
   href: string;
   icono: React.ElementType;
   subItems?: SubItem[];
+  requireHumanTalent?: boolean;
+  requireAdmin?: boolean;
+  positions?: PositionId[];
 }
 
 const ITEMS_NAV: NavItem[] = [
   { etiqueta: "Panel Principal", href: "/dashboard", icono: LayoutDashboard },
   { etiqueta: "Perfil de Usuario", href: "/dashboard/perfil", icono: UserRound },
   { etiqueta: "Organigrama", href: "/dashboard/org-chart", icono: GitFork },
-  { etiqueta: "Directorio de Empleados", href: "/dashboard/empleados", icono: Users },
+  {
+    etiqueta: "Directorio de Empleados",
+    href: "/dashboard/empleados",
+    icono: Users,
+    requireHumanTalent: true,
+  },
   {
     etiqueta: "Gestion de Areas",
     href: "/dashboard/areas",
     icono: FolderKanban,
+    requireHumanTalent: true,
     subItems: [
-      { etiqueta: "Areas", href: "/dashboard/areas" },
-      { etiqueta: "Posiciones", href: "/dashboard/areas/positions" },
+      { etiqueta: "Areas", href: "/dashboard/areas", requireHumanTalent: true },
+      { etiqueta: "Posiciones", href: "/dashboard/areas/positions", requireHumanTalent: true },
     ],
   },
-  { etiqueta: "Contratos", href: "/dashboard/contratos", icono: FileText },
+  { etiqueta: "Contratos", href: "/dashboard/contratos", icono: FileText, requireHumanTalent: true },
 ];
+
+function puedeVer(
+  item: { requireHumanTalent?: boolean; requireAdmin?: boolean; positions?: PositionId[] },
+  authUser: { isAdmin: boolean; position: PositionId | null } | null,
+): boolean {
+  if (!authUser) return false;
+  if (item.requireAdmin && !authUser.isAdmin) return false;
+  if (item.requireHumanTalent && !canManageHumanTalent(authUser)) return false;
+  if (item.positions && item.positions.length > 0) {
+    if (authUser.isAdmin) return true;
+    if (authUser.position == null) return false;
+    return item.positions.includes(authUser.position);
+  }
+  return true;
+}
 
 export default function Sidebar() {
   const router = useRouter();
   const rutaActual = usePathname();
+  const { authUser, signOut } = useAuth();
 
   const handleLogOut = async () => {
     try {
-      await logOutUser();
-
+      await signOut();
       router.push("/login");
-      console.log("Sesión cerrada correctamente");
     } catch (error) {
       console.error("Error al cerrar sesión", error);
     }
@@ -62,6 +90,8 @@ export default function Sidebar() {
     href === "/dashboard"
       ? rutaActual === "/dashboard"
       : rutaActual.startsWith(href);
+
+  const visibles = ITEMS_NAV.filter((item) => puedeVer(item, authUser));
 
   return (
     <aside className="flex flex-col w-[220px] min-h-screen bg-[#0F1819] shrink-0">
@@ -75,9 +105,8 @@ export default function Sidebar() {
         </span>
       </div>
 
-      {/* Navegacion principal */}
       <nav className="flex flex-col gap-1 px-3 py-4 flex-1">
-        {ITEMS_NAV.map(({ etiqueta, href, icono: Icono, subItems }) => {
+        {visibles.map(({ etiqueta, href, icono: Icono, subItems }) => {
           const activo = estaActivo(href);
 
           return (
@@ -99,19 +128,21 @@ export default function Sidebar() {
 
               {activo && subItems && subItems.length > 0 && (
                 <div className="ml-4 mt-0.5 flex flex-col gap-0.5 border-l border-[#1E333A] pl-3">
-                  {subItems.map((sub) => (
-                    <Link
-                      key={sub.href}
-                      href={sub.href}
-                      className={`px-2 py-1.5 rounded-lg text-xs transition-all duration-150 ${
-                        rutaActual === sub.href
-                          ? "text-white font-semibold bg-[#1E333A]"
-                          : "text-[#8aa3ad] hover:text-white hover:bg-[#1E333A]"
-                      }`}
-                    >
-                      {sub.etiqueta}
-                    </Link>
-                  ))}
+                  {subItems
+                    .filter((sub) => puedeVer(sub, authUser))
+                    .map((sub) => (
+                      <Link
+                        key={sub.href}
+                        href={sub.href}
+                        className={`px-2 py-1.5 rounded-lg text-xs transition-all duration-150 ${
+                          rutaActual === sub.href
+                            ? "text-white font-semibold bg-[#1E333A]"
+                            : "text-[#8aa3ad] hover:text-white hover:bg-[#1E333A]"
+                        }`}
+                      >
+                        {sub.etiqueta}
+                      </Link>
+                    ))}
                 </div>
               )}
             </div>
@@ -119,7 +150,6 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Parte inferior */}
       <div className="flex flex-col gap-1 px-3 pb-5 border-t border-[#1E333A] pt-3">
         <button
           onClick={handleLogOut}

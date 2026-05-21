@@ -132,14 +132,11 @@ export default function RenewContractFlow({
   const confirmarRenovacion = async () => {
     setEnviando(true);
     try {
+      // El endpoint del backend (PATCH /renew-contract/:id) sólo acepta `newEndDate`.
+      // Los demás campos (tipo, salario, notas) se ignoran a propósito.
       const datos: RenovarContratoDTO = {
         contratoActualId: contrato.id,
-        tipo,
-        fechaInicio,
-        fechaFin: fechaFin || null,
-        salarioBase: salarioNumero,
-        notas: notas.trim(),
-        documentoNombre,
+        nuevaFechaFin: fechaFin || "",
       };
       await renovarContrato(datos);
       onSuccess();

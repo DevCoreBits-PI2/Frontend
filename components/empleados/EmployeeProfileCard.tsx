@@ -38,6 +38,18 @@ const CONFIG_ESTADO: Record<
     thumbPosition: "translate-x-[22px]",
     labelColor: "text-rose-500",
   },
+  INACTIVO: {
+    etiqueta: "Inactive",
+    trackColor: "bg-slate-400",
+    thumbPosition: "translate-x-[22px]",
+    labelColor: "text-slate-500",
+  },
+  INVITADO: {
+    etiqueta: "Invited",
+    trackColor: "bg-sky-400",
+    thumbPosition: "translate-x-0",
+    labelColor: "text-sky-500",
+  },
 } as const;
 
 function StatusToggle({ estado }: { estado: EstadoEmpleado }) {

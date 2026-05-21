@@ -1,4 +1,16 @@
-// Servicio mock para el formulario de registro de empleado
+// Servicio de registro (invitación) de empleado — usa el backend real.
+//
+// El backend (users-ms) exige los campos en snake_case del DTO `InviteUserDto`.
+// La UI del wizard pasa `fullName`, `documentNumber`, etc.; aquí convertimos al
+// contrato exacto del backend y reportamos errores de manera homogénea.
+
+import { ApiError, apiGet, apiPost } from "@/lib/api/client";
+import { EMPLOYEES } from "@/lib/api/endpoints";
+import { normalizePaginated } from "@/types/api/common";
+import { obtenerAreas } from "./areasService";
+import { obtenerPosiciones } from "./positionsService";
+import type { EmployeeDto, InviteUserPayload } from "@/types/api/employee";
+
 export interface Position {
   id: string;
   nombre: string;
@@ -6,29 +18,31 @@ export interface Position {
 }
 
 export const DOCUMENT_TYPES = [
-  { id: 'dni', nombre: 'DNI' },
-  { id: 'passport', nombre: 'Passport' },
-  { id: 'ce', nombre: 'Carnet de Extranjeria' },
+  { id: "dni", nombre: "DNI" },
+  { id: "passport", nombre: "Passport" },
+  { id: "ce", nombre: "Carnet de Extranjeria" },
 ];
 
 export const CONTRACT_TYPES = [
-  { id: 'fulltime', nombre: 'Full Time' },
-  { id: 'parttime', nombre: 'Part Time' },
-  { id: 'temporal', nombre: 'Temporal' },
+  { id: "fulltime", nombre: "Full Time" },
+  { id: "parttime", nombre: "Part Time" },
+  { id: "temporal", nombre: "Temporal" },
 ];
 
-export const AREAS_MOCK = [
-  { id: '1', nombre: 'Ingenieria' },
-  { id: '2', nombre: 'Recursos Humanos' },
-  { id: '3', nombre: 'Finanzas' },
-];
+// Reemplazamos los mocks por datos del backend.
+export async function obtenerAreasParaRegistro(): Promise<{ id: string; nombre: string }[]> {
+  const areas = await obtenerAreas();
+  return areas.map((a) => ({ id: a.id, nombre: a.nombre }));
+}
 
-export const POSITIONS_MOCK: Position[] = [
-  { id: 'p1', nombre: 'Software Engineer', areaId: '1' },
-  { id: 'p2', nombre: 'QA Engineer', areaId: '1' },
-  { id: 'p3', nombre: 'HR Specialist', areaId: '2' },
-  { id: 'p4', nombre: 'Accountant', areaId: '3' },
-];
+export async function obtenerPosicionesParaRegistro(): Promise<Position[]> {
+  const { data } = await obtenerPosiciones({ pageSize: 100 });
+  return data.map((p) => ({
+    id: String(p.rawId),
+    nombre: p.nombre,
+    areaId: String(p.areaIdNumber),
+  }));
+}
 
 export interface RegisterPayload {
   fullName: string;
@@ -36,15 +50,19 @@ export interface RegisterPayload {
   documentNumber: string;
   email: string;
   phone: string;
-  photo?: string; // data URL
+  photo?: string;
   files?: { name: string; size: number; type: string }[];
   areaId?: string;
   positionId?: string;
   hireDate?: string;
   contractType?: string;
+  // Campos adicionales que el backend exige:
+  age?: number;
+  idAdministrator?: number;
+  managerId?: number | null;
 }
 
-export type RegisterErrorCode = "DUPLICATE_DOCUMENT";
+export type RegisterErrorCode = "DUPLICATE_DOCUMENT" | "BACKEND_ERROR";
 
 export interface RegisterResult {
   success: boolean;
@@ -54,34 +72,73 @@ export interface RegisterResult {
   errorMessage?: string;
 }
 
-// Documentos ya registrados (mock). En produccion vendria del backend.
-export const REGISTERED_DOCUMENTS_MOCK = new Set<string>([
-  "12345678",
-  "87654321",
-  "1098765432",
-]);
-
-export const isDocumentDuplicated = (documentNumber?: string): boolean => {
+// Chequeo previo contra los empleados existentes (no hay endpoint dedicado
+// para "duplicado por documento"; usamos `code` como identificador único).
+export const isDocumentDuplicated = async (documentNumber?: string): Promise<boolean> => {
   if (!documentNumber) return false;
-  return REGISTERED_DOCUMENTS_MOCK.has(documentNumber.trim());
+  const documento = Number(documentNumber.replace(/\D/g, ""));
+  if (!documento) return false;
+  try {
+    const data = await apiGet<unknown>(EMPLOYEES.findAll);
+    return normalizePaginated<EmployeeDto>(data).some((e) => e.code === documento);
+  } catch {
+    return false; // si no se puede verificar, dejar que el backend valide.
+  }
 };
 
-export const enviarRegistroMock = async (
+function partirNombre(fullName: string): { first_name: string; last_name: string } {
+  const partes = fullName.trim().split(/\s+/);
+  if (partes.length === 0) return { first_name: "", last_name: "" };
+  if (partes.length === 1) return { first_name: partes[0], last_name: "" };
+  return {
+    first_name: partes.slice(0, -1).join(" "),
+    last_name: partes[partes.length - 1],
+  };
+}
+
+export const enviarRegistroEmpleado = async (
   payload: RegisterPayload,
 ): Promise<RegisterResult> => {
-  await new Promise((r) => setTimeout(r, 800));
-
-  if (isDocumentDuplicated(payload.documentNumber)) {
+  if (await isDocumentDuplicated(payload.documentNumber)) {
     return {
       success: false,
       errorCode: "DUPLICATE_DOCUMENT",
       errorMessage:
-        "Ya existe un empleado registrado en el sistema con este número de documento. Por favor, inténtalo de nuevo con un número de documento válido.",
+        "Ya existe un empleado registrado en el sistema con este número de documento.",
     };
   }
 
-  // generar id tipo EMP-YYYY-NNN
-  const year = new Date().getFullYear();
-  const random = String(Math.floor(Math.random() * 900) + 100);
-  return { success: true, employeeId: `EMP-${year}-${random}`, payload };
+  if (!payload.positionId || !payload.idAdministrator) {
+    return {
+      success: false,
+      errorCode: "BACKEND_ERROR",
+      errorMessage: "Faltan datos obligatorios (cargo o administrador responsable).",
+    };
+  }
+
+  const { first_name, last_name } = partirNombre(payload.fullName);
+  const documento = Number(payload.documentNumber.replace(/\D/g, ""));
+
+  const body: InviteUserPayload = {
+    email: payload.email,
+    first_name,
+    last_name,
+    age: payload.age ?? 0,
+    code: documento,
+    status: "invited",
+    id_position: Number(payload.positionId),
+    id_manager: payload.managerId ?? null,
+    id_administrator: payload.idAdministrator,
+  };
+
+  try {
+    const dto = await apiPost<EmployeeDto>(EMPLOYEES.invite, body);
+    return { success: true, employeeId: String(dto.id), payload };
+  } catch (err) {
+    const mensaje = err instanceof ApiError ? err.message : "Error al invitar empleado";
+    return { success: false, errorCode: "BACKEND_ERROR", errorMessage: mensaje };
+  }
 };
+
+// Alias legacy (componentes existentes lo llaman así).
+export const enviarRegistroMock = enviarRegistroEmpleado;

@@ -1,67 +1,87 @@
-import { UserProfile } from "@/types/funcionario";
+// Perfil del usuario autenticado.
+//
+// Endpoints:
+//   GET   /employees/getMyProfile/:id   (auth)
+//   PATCH /employees/updateUser/:id     (auth — el propio empleado)
+//
+// El backend no tiene un endpoint `dashboard/perfil`; usamos los del MS Users.
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-const PROFILE_ENDPOINT = "/dashboard/perfil";
+import { apiGet, apiPatch } from "@/lib/api/client";
+import { EMPLOYEES } from "@/lib/api/endpoints";
+import { createClient } from "@/utils/supabase/client";
+import type { AdminDto } from "@/types/api/admin";
+import type { EmployeeDto, UpdateProfilePayload } from "@/types/api/employee";
+import type { UserProfile } from "@/types/funcionario";
 
-const MOCK_PROFILE: UserProfile = {
-  idFuncionario: 9982,
-  nombre: "Jonathan",
-  apellidos: "Doe",
-  cargo: "Senior Software Architect",
-  area: "Engineering Department",
-  email: "john.doe@company.com",
-  phone: "+1 (555) 000-1234",
-  fechaIngreso: "2019-03-01",
-  ubicacion: "Austin, TX Office",
-  foto: "",
-  estado: "ACTIVO",
-  fechaNacimiento: "1990-10-24",
-  oficina: "New York Headquarters",
-  reportaA: "Sarah Jenkins (Engineering Manager)",
-};
+function empleadoDtoToUserProfile(dto: EmployeeDto): UserProfile {
+  return {
+    idFuncionario: dto.id,
+    nombre: dto.first_name ?? "",
+    apellidos: dto.last_name ?? "",
+    cargo: dto.position?.name ?? "",
+    area: dto.position?.area?.name ?? dto.area?.name ?? "",
+    email: dto.email ?? "",
+    phone: "",
+    fechaIngreso: dto.created_at?.slice(0, 10) ?? "",
+    ubicacion: "",
+    foto: dto.photo_url ?? "",
+    estado: dto.status === "active" ? "ACTIVO" : "INACTIVO",
+    fechaNacimiento: "",
+    oficina: "",
+    reportaA: dto.manager
+      ? `${dto.manager.first_name ?? ""} ${dto.manager.last_name ?? ""}`.trim()
+      : "",
+  };
+}
 
-async function solicitarPerfil(): Promise<UserProfile> {
-  try {
-    const response = await fetch(`${API_URL}${PROFILE_ENDPOINT}`, {
-      headers: {
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
+// Mapea un AdminDto al shape `UserProfile` que la UI espera. Los admins no
+// tienen cargo/área/manager, así que esos campos quedan en blanco o con un
+// texto fijo ("Administrador") para que la card se renderice bien.
+export function adminDtoToUserProfile(dto: AdminDto): UserProfile {
+  return {
+    idFuncionario: dto.id,
+    nombre: dto.name ?? "",
+    apellidos: dto.last_name ?? "",
+    cargo: "Administrador",
+    area: "Administración",
+    email: dto.email ?? "",
+    phone: "",
+    fechaIngreso: "",
+    ubicacion: "",
+    foto: "",
+    estado: "ACTIVO",
+    fechaNacimiento: "",
+    oficina: "",
+    reportaA: "",
+  };
+}
 
-    if (!response.ok) {
-      throw new Error("No se pudo obtener el perfil");
-    }
-
-    return (await response.json()) as UserProfile;
-  } catch {
-    return MOCK_PROFILE;
-  }
+async function getSupabaseUserId(): Promise<string | null> {
+  const supabase = createClient();
+  const { data } = await supabase.auth.getUser();
+  return data.user?.id ?? null;
 }
 
 export async function obtenerPerfilUsuario(): Promise<UserProfile> {
-  return solicitarPerfil();
+  const uid = await getSupabaseUserId();
+  if (!uid) {
+    throw new Error("No hay sesión activa");
+  }
+  const dto = await apiGet<EmployeeDto>(EMPLOYEES.myProfile(uid));
+  return empleadoDtoToUserProfile(dto);
 }
 
 export async function actualizarPerfilUsuario(
   perfil: UserProfile,
 ): Promise<UserProfile> {
-  try {
-    const response = await fetch(`${API_URL}${PROFILE_ENDPOINT}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(perfil),
-    });
-
-    if (!response.ok) {
-      throw new Error("No se pudo actualizar el perfil");
-    }
-
-    return (await response.json()) as UserProfile;
-  } catch {
-    return perfil;
+  const uid = await getSupabaseUserId();
+  if (!uid) {
+    throw new Error("No hay sesión activa");
   }
+  const payload: UpdateProfilePayload = {
+    id_employee: perfil.idFuncionario,
+    photo_url: perfil.foto || undefined,
+  };
+  const dto = await apiPatch<EmployeeDto>(EMPLOYEES.updateProfile(uid), payload);
+  return empleadoDtoToUserProfile(dto);
 }

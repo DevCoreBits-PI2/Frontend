@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ChevronRight, ChevronDown, TrendingUp } from "lucide-react";
 import { Empleado, obtenerEmpleadoPorId, guardarEvaluacion, Evaluation } from "@/services/empleadosService";
+import toast from "react-hot-toast";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -131,6 +133,7 @@ export default function EvaluacionEmpleadoPage() {
   const router  = useRouter();
   const params  = useParams();
   const empId   = params?.id as string;
+  const { authUser } = useAuth();
 
   const [empleado, setEmpleado]         = useState<Empleado | null>(null);
   const [cargando, setCargando]         = useState(true);
@@ -383,11 +386,17 @@ export default function EvaluacionEmpleadoPage() {
                   observations,
                 };
 
+                if (!authUser?.employeeId) {
+                  toast.error("No se identificó al evaluador (perfil sin id de empleado).");
+                  return;
+                }
                 try {
-                  await guardarEvaluacion(empId, evalObj);
-                  // Redirigir al detalle del empleado para ver la evaluación en desempeño
+                  await guardarEvaluacion(empId, evalObj, authUser.employeeId);
+                  toast.success("Evaluación guardada.");
                   router.push(`/dashboard/empleados/${empId}`);
                 } catch (err) {
+                  const mensaje = err instanceof Error ? err.message : "No se pudo guardar la evaluación.";
+                  toast.error(mensaje);
                   console.error("Error guardando evaluación:", err);
                 }
               }}

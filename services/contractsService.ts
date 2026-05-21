@@ -1,130 +1,114 @@
 // services/contractsService.ts
-import { ContratoUI, EstadisticasContratos } from "@/types/contract";
+//
+// Listado/Estadísticas de contratos para la vista global (/dashboard/contratos).
+// Se apoya 100% en contratosService.ts + el endpoint /stats del backend.
+
+import { apiGet, ForbiddenError } from "@/lib/api/client";
+import { CONTRACTS } from "@/lib/api/endpoints";
+import { normalizePaginated } from "@/types/api/common";
+import { obtenerTodosLosContratos, type Contrato } from "@/services/contratosService";
+import { obtenerEmpleados, type Empleado } from "@/services/empleadosService";
+import type { ContractDto, ContractStats } from "@/types/api/contract";
+import type {
+  ContratoUI,
+  EstadisticasContratos,
+  EstadoContratoUI,
+  TipoContrato as TipoContratoUI,
+} from "@/types/contract";
+
+const TIPO_UI: Record<Contrato["tipo"], TipoContratoUI> = {
+  FIJO: "Término Fijo",
+  INDEFINIDO: "Término Indefinido",
+  SERVICIO: "Servicio",
+  TIEMPO_PARCIAL: "Pasantía",
+};
+
+const ESTADO_UI: Record<Contrato["estado"], EstadoContratoUI> = {
+  ACTIVO: "Activo",
+  RENOVADO: "Renovado",
+  EXPIRADO: "Vencido",
+  ANULADO: "Anulado",
+};
+
+function avatar(nombre: string): string {
+  return nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p.charAt(0).toUpperCase())
+    .join("");
+}
+
+function validezTexto(c: Contrato): { texto: string; porcentaje: number } {
+  if (c.estado === "ANULADO") return { texto: "Anulado", porcentaje: 100 };
+  if (c.estado === "RENOVADO") return { texto: "Renovado", porcentaje: 60 };
+  if (!c.fechaFin) return { texto: "En curso - Sin vencimiento", porcentaje: 50 };
+
+  const fin = new Date(c.fechaFin).getTime();
+  const inicio = new Date(c.fechaInicio).getTime();
+  const hoy = Date.now();
+  const totalMs = Math.max(fin - inicio, 1);
+  const consumidoMs = Math.min(Math.max(hoy - inicio, 0), totalMs);
+  const porcentaje = Math.round((consumidoMs / totalMs) * 100);
+  const diasRestantes = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
+  const texto = diasRestantes <= 0 ? `Vencido hace ${Math.abs(diasRestantes)} días`
+    : `${diasRestantes} días restantes`;
+  return { texto, porcentaje };
+}
 
 export async function obtenerEstadisticasContratos(): Promise<EstadisticasContratos> {
-  await new Promise((r) => setTimeout(r, 300));
-  return {
-    activos: 1186,
-    proxAVencer: 8,
-    renovados: 234,
-    vencidosAnulados: 45,
-  };
+  try {
+    const stats = await apiGet<ContractStats>(CONTRACTS.stats);
+    return {
+      activos: stats.activos ?? stats.valid ?? 0,
+      proxAVencer: stats.proxAVencer ?? stats.expiring_soon ?? 0,
+      renovados: stats.renovados ?? 0,
+      vencidosAnulados: stats.vencidosAnulados ?? stats.expired ?? 0,
+    };
+  } catch (err) {
+    if (err instanceof ForbiddenError) {
+      return { activos: 0, proxAVencer: 0, renovados: 0, vencidosAnulados: 0 };
+    }
+    throw err;
+  }
 }
 
 export async function obtenerContratos(): Promise<ContratoUI[]> {
-  await new Promise((r) => setTimeout(r, 500));
-  return [
-    {
-      idContrato: 1,
-      funcionario: { nombre: "Erik Vance", idContrato: "CN-8829", avatar: "EV" },
-      tipoUI: "Término Fijo",
-      area: "Finanzas",
-      condiciones: "Contrato externo",
-      tipo: "Externo",
-      vigencia: "no_vigente",
-      fechaInicio: "Oct 24, 2022",
-      fechaFin: "Oct 24, 2023",
-      estadoUI: "Vencido",
-      validezTexto: "Vencido hace 1 día",
-      validezPorcentaje: 100,
-    },
-    {
-      idContrato: 2,
-      funcionario: { nombre: "Diana Marsh", idContrato: "CN-1102", avatar: "DM" },
-      tipoUI: "Término Fijo",
-      area: "Operaciones",
-      condiciones: "Contrato de seguridad",
-      tipo: "Interno",
-      vigencia: "no_vigente",
-      fechaInicio: "Nov 02, 2022",
-      fechaFin: "Nov 02, 2023",
-      estadoUI: "Vencido",
-      validezTexto: "Vence en 6 días",
-      validezPorcentaje: 95,
-    },
-    {
-      idContrato: 3,
-      funcionario: { nombre: "James Holloway", idContrato: "CN-5541", avatar: "JH" },
-      tipoUI: "Término Fijo",
-      area: "Ingeniería",
-      condiciones: "Contrato técnico",
-      tipo: "Interno",
-      vigencia: "vigente",
-      fechaInicio: "Nov 11, 2022",
-      fechaFin: "Nov 11, 2023",
-      estadoUI: "Activo",
-      validezTexto: "21 días restantes",
-      validezPorcentaje: 70,
-    },
-    {
-      idContrato: 4,
-      funcionario: { nombre: "Alex Rivera", idContrato: "CN-9012", avatar: "AR" },
-      tipoUI: "Término Indefinido",
-      area: "Ingeniería",
-      condiciones: "Contrato indefinido",
-      tipo: "Interno",
-      vigencia: "vigente",
-      fechaInicio: "Ene 15, 2022",
-      fechaFin: "-",
-      estadoUI: "Activo",
-      validezTexto: "En curso - Sin vencimiento",
-      validezPorcentaje: 50,
-    },
-    {
-      idContrato: 5,
-      funcionario: { nombre: "Sofia Reyes", idContrato: "CN-7399", avatar: "SR" },
-      tipoUI: "Término Fijo",
-      area: "RRHH",
-      condiciones: "Contrato estándar",
-      tipo: "Interno",
-      vigencia: "vigente",
-      fechaInicio: "Mar 01, 2023",
-      fechaFin: "Mar 01, 2024",
-      estadoUI: "Activo",
-      validezTexto: "168 días restantes",
-      validezPorcentaje: 40,
-    },
-    {
-      idContrato: 6,
-      funcionario: { nombre: "Laura Chen", idContrato: "CN-3362", avatar: "LC" },
-      tipoUI: "Servicio",
-      area: "Analítica",
-      condiciones: "Contrato de servicio",
-      tipo: "Externo",
-      vigencia: "vigente",
-      fechaInicio: "Ene 01, 2023",
-      fechaFin: "Dic 31, 2023",
-      estadoUI: "Activo",
-      validezTexto: "10 días restantes",
-      validezPorcentaje: 85,
-    },
-    {
-      idContrato: 7,
-      funcionario: { nombre: "Robert Kim", idContrato: "DN-7841", avatar: "RK" },
-      tipoUI: "Término Fijo",
-      area: "Legal",
-      condiciones: "Contrato renovado",
-      tipo: "Interno",
-      vigencia: "vigente",
-      fechaInicio: "Feb 01, 2022",
-      fechaFin: "Feb 01, 2023",
-      estadoUI: "Renovado",
-      validezTexto: "Renovado Ene 28, 2023",
-      validezPorcentaje: 60,
-    },
-    {
-      idContrato: 8,
-      funcionario: { nombre: "Anna Brooks", idContrato: "CN-6503", avatar: "AB" },
-      tipoUI: "Pasantía",
-      area: "Finanzas",
-      condiciones: "Contrato pasantía",
-      tipo: "Externo",
-      vigencia: "no_vigente",
-      fechaInicio: "Jun 01, 2023",
-      fechaFin: "Ago 31, 2023",
-      estadoUI: "Anulado",
-      validezTexto: "Anulado Ago 15, 2023",
-      validezPorcentaje: 100,
-    },
-  ];
+  let contratos: Contrato[] = [];
+  let empleados: Empleado[] = [];
+  try {
+    [contratos, empleados] = await Promise.all([
+      obtenerTodosLosContratos(),
+      obtenerEmpleados().catch(() => []),
+    ]);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return [];
+    throw err;
+  }
+
+  const empleadoById = new Map(empleados.map((e) => [e.id, e]));
+
+  return contratos.map<ContratoUI>((c) => {
+    const emp = empleadoById.get(c.idEmpleado);
+    const nombre = emp ? `${emp.nombre} ${emp.apellidos}`.trim() : `Empleado #${c.idEmpleado}`;
+    const { texto, porcentaje } = validezTexto(c);
+    return {
+      idContrato: c.rawId,
+      funcionario: {
+        nombre,
+        idContrato: `CN-${String(c.rawId).padStart(4, "0")}`,
+        avatar: avatar(nombre),
+      },
+      tipoUI: TIPO_UI[c.tipo],
+      area: emp?.departamento ?? "",
+      condiciones: c.notas,
+      tipo: c.tipo,
+      vigencia: c.estado === "EXPIRADO" || c.estado === "ANULADO" ? "no_vigente" : "vigente",
+      fechaInicio: c.fechaInicio,
+      fechaFin: c.fechaFin ?? "-",
+      estadoUI: ESTADO_UI[c.estado],
+      validezTexto: texto,
+      validezPorcentaje: porcentaje,
+    };
+  });
 }

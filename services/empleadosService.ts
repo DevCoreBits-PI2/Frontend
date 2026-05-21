@@ -1,17 +1,53 @@
-export type EstadoEmpleado = "ACTIVO" | "SUSPENDIDO" | "RETIRADO";
+// Servicio de Empleados — integrado con el Gateway real.
+//
+// Endpoints:
+//   POST   /employees/inviteUser              [HumanTalent | Admin]
+//   GET    /employees/findAll                 [HumanTalent | Admin]
+//   GET    /employees/:id                     (auth; permisos: dueño / jefe / HT / admin)
+//   GET    /employees/getMyProfile/:id        (auth)
+//   GET    /employees/getSubordinates/:id     (auth)
+//   PATCH  /employees/updateUser/:id          (auth — perfil propio)
+//   PATCH  /employees/updateEmployee/:id      [HumanTalent | Admin]
+//   GET    /employees/firstTimeSetup/:id      (auth)
+//   PATCH  /employees/completeFirstLogin/:id  (auth)
+//
+// Las evaluaciones SE PERSISTEN en el backend vía /create-performance-evaluation,
+// pero los componentes existentes esperan la forma `Evaluation`; usamos el adapter.
+
+import { apiGet, apiPatch, apiPost } from "@/lib/api/client";
+import { EMPLOYEES } from "@/lib/api/endpoints";
+import { PERFORMANCE } from "@/lib/api/endpoints";
+import { normalizePaginated } from "@/types/api/common";
+import type {
+  EmployeeDto,
+  EmployeeStatus,
+  InviteUserPayload,
+  UpdateEmployeePayload,
+  UpdateProfilePayload,
+} from "@/types/api/employee";
+import type {
+  CreatePerformanceEvaluationPayload,
+  PerformanceEvaluationDto,
+} from "@/types/api/career";
+
+export type EstadoEmpleado = "ACTIVO" | "SUSPENDIDO" | "RETIRADO" | "INACTIVO" | "INVITADO";
 
 export interface Empleado {
   id: string;
+  rawId: number;
   codigoEmpleado: string;
   nombre: string;
   apellidos: string;
   cargo: string;
+  cargoId: number;
   departamento: string;
+  areaId?: number;
   ubicacion: string;
   tipoEmpleo: string;
   email: string;
   estado: EstadoEmpleado;
   foto: string;
+  managerId: number | null;
 }
 
 export interface EvaluationCompetency {
@@ -30,97 +66,189 @@ export interface Evaluation {
   observations?: string;
 }
 
-// In-memory evaluations store keyed by empleado id (mock persistence)
-const EVALUATIONS_STORE: Record<string, Evaluation[]> = {};
+function statusToUi(s?: EmployeeStatus): EstadoEmpleado {
+  switch (s) {
+    case "active": return "ACTIVO";
+    case "suspended": return "SUSPENDIDO";
+    case "retired": return "RETIRADO";
+    case "inactive": return "INACTIVO";
+    case "invited": return "INVITADO";
+    default: return "ACTIVO";
+  }
+}
 
-export const guardarEvaluacion = async (empleadoId: string, evaluation: Evaluation): Promise<Evaluation> => {
-  await new Promise((r) => setTimeout(r, 200));
-  if (!EVALUATIONS_STORE[empleadoId]) EVALUATIONS_STORE[empleadoId] = [];
-  EVALUATIONS_STORE[empleadoId].unshift(evaluation);
-  return evaluation;
-};
+export function statusToBackend(s: EstadoEmpleado): EmployeeStatus {
+  switch (s) {
+    case "ACTIVO": return "active";
+    case "SUSPENDIDO": return "suspended";
+    case "RETIRADO": return "retired";
+    case "INACTIVO": return "inactive";
+    case "INVITADO": return "invited";
+  }
+}
 
-export const obtenerEvaluacionesEmpleado = async (empleadoId: string): Promise<Evaluation[]> => {
-  await new Promise((r) => setTimeout(r, 180));
-  return EVALUATIONS_STORE[empleadoId] ?? [];
-};
+export function dtoToEmpleado(dto: EmployeeDto): Empleado {
+  return {
+    id: String(dto.id),
+    rawId: dto.id,
+    codigoEmpleado: `EMP-${dto.code ?? dto.id}`,
+    nombre: dto.first_name ?? "",
+    apellidos: dto.last_name ?? "",
+    cargo: dto.position?.name ?? "",
+    cargoId: dto.id_position,
+    departamento: dto.position?.area?.name ?? dto.area?.name ?? "",
+    areaId: dto.position?.area?.id ?? dto.position?.id_area,
+    ubicacion: "",
+    tipoEmpleo: "Full-time Employee",
+    email: dto.email ?? "",
+    estado: statusToUi(dto.status),
+    foto: dto.photo_url ?? "",
+    managerId: dto.id_manager,
+  };
+}
 
-export const EMPLEADOS_MOCK: Empleado[] = [
-  {
-    id: "9284",
-    codigoEmpleado: "EMP-9284",
-    nombre: "Jonathan",
-    apellidos: "Doe",
-    cargo: "Senior Software Engineer",
-    departamento: "Engineering",
-    ubicacion: "San Francisco, CA",
-    tipoEmpleo: "Full-time Employee",
-    email: "jonathan.doe@talentcore.com",
-    estado: "ACTIVO",
-    foto: "",
-  },
-  {
-    id: "9982",
-    codigoEmpleado: "EMP-9982-A",
-    nombre: "Jonathan",
-    apellidos: "Doe",
-    cargo: "Senior Software Architect",
-    departamento: "Engineering Department",
-    ubicacion: "Austin, TX Office",
-    tipoEmpleo: "Full-time Employee",
-    email: "john.doe@company.com",
-    estado: "ACTIVO",
-    foto: "",
-  },
-  {
-    id: "1024",
-    codigoEmpleado: "EMP-1024",
-    nombre: "Alex",
-    apellidos: "Rivera",
-    cargo: "Marketing Manager",
-    departamento: "Marketing",
-    ubicacion: "New York, NY",
-    tipoEmpleo: "Full-time Employee",
-    email: "alex.rivera@talentcore.com",
-    estado: "ACTIVO",
-    foto: "",
-  },
-  {
-    id: "2031",
-    codigoEmpleado: "EMP-2031",
-    nombre: "Maria",
-    apellidos: "Gomez",
-    cargo: "HR Specialist",
-    departamento: "Recursos Humanos",
-    ubicacion: "Miami, FL",
-    tipoEmpleo: "Full-time Employee",
-    email: "maria.gomez@talentcore.com",
-    estado: "ACTIVO",
-    foto: "",
-  },
-  {
-    id: "3098",
-    codigoEmpleado: "EMP-3098",
-    nombre: "Carlos",
-    apellidos: "Mendez",
-    cargo: "Financial Analyst",
-    departamento: "Operaciones Financieras",
-    ubicacion: "Bogota, CO",
-    tipoEmpleo: "Full-time Employee",
-    email: "carlos.mendez@talentcore.com",
-    estado: "SUSPENDIDO",
-    foto: "",
-  },
-];
+// ───────────────────────── Empleados ─────────────────────────
 
 export const obtenerEmpleados = async (): Promise<Empleado[]> => {
-  await new Promise((resolve) => setTimeout(resolve, 350));
-  return EMPLEADOS_MOCK;
+  const data = await apiGet<unknown>(EMPLOYEES.findAll);
+  return normalizePaginated<EmployeeDto>(data).map(dtoToEmpleado);
 };
 
-export const obtenerEmpleadoPorId = async (
-  id: string,
-): Promise<Empleado | null> => {
-  await new Promise((resolve) => setTimeout(resolve, 250));
-  return EMPLEADOS_MOCK.find((e) => e.id === id) ?? null;
+export const obtenerEmpleadoPorId = async (id: string): Promise<Empleado | null> => {
+  try {
+    const dto = await apiGet<EmployeeDto>(EMPLOYEES.findOne(id));
+    return dtoToEmpleado(dto);
+  } catch {
+    return null;
+  }
+};
+
+export const obtenerMiPerfil = async (supabaseUserId: string): Promise<Empleado | null> => {
+  try {
+    const dto = await apiGet<EmployeeDto>(EMPLOYEES.myProfile(supabaseUserId));
+    return dtoToEmpleado(dto);
+  } catch {
+    return null;
+  }
+};
+
+export const obtenerSubordinados = async (managerId: number | string): Promise<Empleado[]> => {
+  const data = await apiGet<unknown>(EMPLOYEES.subordinates(managerId));
+  return normalizePaginated<EmployeeDto>(data).map(dtoToEmpleado);
+};
+
+export const invitarEmpleado = async (payload: InviteUserPayload): Promise<EmployeeDto> =>
+  apiPost<EmployeeDto>(EMPLOYEES.invite, payload);
+
+export const actualizarPerfilEmpleado = async (
+  supabaseUserId: string,
+  payload: UpdateProfilePayload,
+): Promise<EmployeeDto> => apiPatch<EmployeeDto>(EMPLOYEES.updateProfile(supabaseUserId), payload);
+
+export const actualizarEmpleado = async (
+  employeeId: number | string,
+  payload: UpdateEmployeePayload,
+): Promise<EmployeeDto> => apiPatch<EmployeeDto>(EMPLOYEES.updateEmployee(employeeId), payload);
+
+// ───────────────────────── Evaluaciones ─────────────────────────
+//
+// El backend modela 5 competencias con nombres fijos:
+//   communication, technical_proficiency, leadership_influence, innovation, reliability
+// La UI maneja nombres con etiquetas; mapeamos en ambas direcciones.
+
+const COMPETENCY_TO_FIELD: Record<string, keyof CreatePerformanceEvaluationPayload> = {
+  comunicacion: "communication",
+  comunicación: "communication",
+  communication: "communication",
+  tecnica: "technical_proficiency",
+  técnica: "technical_proficiency",
+  technical: "technical_proficiency",
+  liderazgo: "leadership_influence",
+  leadership: "leadership_influence",
+  innovacion: "innovation",
+  innovación: "innovation",
+  innovation: "innovation",
+  confianza: "reliability",
+  confiabilidad: "reliability",
+  reliability: "reliability",
+};
+
+const FIELD_TO_LABEL: Record<string, string> = {
+  communication: "Comunicación",
+  technical_proficiency: "Técnica",
+  leadership_influence: "Liderazgo",
+  innovation: "Innovación",
+  reliability: "Confianza",
+};
+
+function evaluationToPayload(
+  empleadoIdNum: number,
+  ev: Evaluation,
+  directorId: number,
+): CreatePerformanceEvaluationPayload {
+  const payload: CreatePerformanceEvaluationPayload = {
+    id_director: directorId,
+    id_employee: empleadoIdNum,
+    observations: ev.observations,
+    evaluation_date: ev.date,
+  };
+  for (const c of ev.competencies) {
+    const key = COMPETENCY_TO_FIELD[c.name.toLowerCase()];
+    if (key && typeof c.score === "number") {
+      (payload as unknown as Record<string, unknown>)[key] = c.score;
+    }
+  }
+  return payload;
+}
+
+function dtoToEvaluation(dto: PerformanceEvaluationDto): Evaluation {
+  const competencies: EvaluationCompetency[] = [];
+  const map = {
+    communication: dto.communication,
+    technical_proficiency: dto.technical_proficiency,
+    leadership_influence: dto.leadership_influence,
+    innovation: dto.innovation,
+    reliability: dto.reliability,
+  } as const;
+  let sum = 0;
+  let count = 0;
+  for (const [field, score] of Object.entries(map)) {
+    if (typeof score === "number") {
+      competencies.push({ name: FIELD_TO_LABEL[field], score });
+      sum += score;
+      count += 1;
+    }
+  }
+  const avg = count > 0 ? sum / count : 0;
+  return {
+    id: String(dto.id),
+    title: "Evaluación de desempeño",
+    reviewer: String(dto.id_director),
+    date: dto.evaluation_date,
+    score: Number(avg.toFixed(2)),
+    competencies,
+    observations: dto.observations,
+  };
+}
+
+export const guardarEvaluacion = async (
+  empleadoId: string,
+  evaluation: Evaluation,
+  directorId: number,
+): Promise<Evaluation> => {
+  const empleadoIdNum = Number(empleadoId);
+  const payload = evaluationToPayload(empleadoIdNum, evaluation, directorId);
+  const dto = await apiPost<PerformanceEvaluationDto>(PERFORMANCE.create, payload);
+  return dtoToEvaluation(dto);
+};
+
+export const obtenerEvaluacionesEmpleado = async (
+  empleadoId: string,
+): Promise<Evaluation[]> => {
+  try {
+    const data = await apiGet<unknown>(PERFORMANCE.byEmployee(empleadoId));
+    return normalizePaginated<PerformanceEvaluationDto>(data).map(dtoToEvaluation);
+  } catch {
+    return [];
+  }
 };
