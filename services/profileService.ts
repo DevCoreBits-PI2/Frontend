@@ -1,22 +1,41 @@
 // Perfil del usuario autenticado.
 //
-// Endpoints:
-//   GET   /employees/getMyProfile/:id   (auth)
-//   PATCH /employees/updateUser/:id     (auth — el propio empleado)
+// Endpoints (gateway):
+//   GET   /employees/getMyProfile/:supabaseUserId       (auth — dueño/jefe/HT/admin)
+//   PATCH /employees/updateUser/:supabaseUserId         (auth — el propio empleado)
 //
-// El backend no tiene un endpoint `dashboard/perfil`; usamos los del MS Users.
+// El backend NO expone phone/birthdate/office/location ni permite cambiar nombre
+// o email aquí: el DTO UpdateProfile solo acepta { id_employee, photo_url?, age? }.
+// Además, el PATCH responde solo { id_employee, email, age, photo_url } (sin
+// nombre/cargo/manager), por eso después del update hacemos un re-fetch completo
+// con `obtenerPerfilUsuario` para no perder los campos no devueltos.
 
 import { apiGet, apiPatch } from "@/lib/api/client";
 import { EMPLOYEES } from "@/lib/api/endpoints";
 import { createClient } from "@/utils/supabase/client";
 import type { AdminDto } from "@/types/api/admin";
-import type { EmployeeDto, UpdateProfilePayload } from "@/types/api/employee";
-import type { UserProfile } from "@/types/funcionario";
+import type { EmployeeDto, EmployeeStatus, UpdateProfilePayload } from "@/types/api/employee";
+import type { EstadoPerfilUsuario, UserProfile } from "@/types/funcionario";
 
-function empleadoDtoToUserProfile(dto: EmployeeDto): UserProfile {
+function statusBackendToUi(s?: EmployeeStatus): EstadoPerfilUsuario {
+  switch (s) {
+    case "active":    return "ACTIVO";
+    case "suspended": return "SUSPENDIDO";
+    case "retired":   return "RETIRADO";
+    case "invited":   return "INVITADO";
+    case "inactive":  return "INACTIVO";
+    default:          return "INACTIVO";
+  }
+}
+
+export function empleadoDtoToUserProfile(dto: EmployeeDto): UserProfile {
   const id = dto.id ?? dto.id_employee ?? 0;
+  const managerNombre = dto.manager
+    ? `${dto.manager.first_name ?? ""} ${dto.manager.last_name ?? ""}`.trim()
+    : "";
   return {
     idFuncionario: id,
+    codigo: dto.code,
     nombre: dto.first_name ?? "",
     apellidos: dto.last_name ?? "",
     cargo: dto.position?.name ?? "",
@@ -26,18 +45,17 @@ function empleadoDtoToUserProfile(dto: EmployeeDto): UserProfile {
     fechaIngreso: dto.created_at?.slice(0, 10) ?? "",
     ubicacion: "",
     foto: dto.photo_url ?? "",
-    estado: dto.status === "active" ? "ACTIVO" : "INACTIVO",
+    estado: statusBackendToUi(dto.status),
     fechaNacimiento: "",
     oficina: "",
-    reportaA: dto.manager
-      ? `${dto.manager.first_name ?? ""} ${dto.manager.last_name ?? ""}`.trim()
-      : "",
+    reportaA: managerNombre,
+    edad: dto.age,
   };
 }
 
 // Mapea un AdminDto al shape `UserProfile` que la UI espera. Los admins no
-// tienen cargo/área/manager, así que esos campos quedan en blanco o con un
-// texto fijo ("Administrador") para que la card se renderice bien.
+// están en employees, no tienen cargo/área/manager/edad; rellenamos lo mínimo
+// para que la card no rompa.
 export function adminDtoToUserProfile(dto: AdminDto): UserProfile {
   return {
     idFuncionario: dto.id,
@@ -72,17 +90,28 @@ export async function obtenerPerfilUsuario(): Promise<UserProfile> {
   return empleadoDtoToUserProfile(dto);
 }
 
+export interface ActualizarPerfilInput {
+  idEmployee: number;
+  photoUrl?: string;
+  edad?: number;
+}
+
 export async function actualizarPerfilUsuario(
-  perfil: UserProfile,
+  input: ActualizarPerfilInput,
 ): Promise<UserProfile> {
-  const uid = await getSupabaseUserId();
-  if (!uid) {
-    throw new Error("No hay sesión activa");
+  if (!input.idEmployee) {
+    throw new Error("No se conoce el id del empleado.");
   }
-  const payload: UpdateProfilePayload = {
-    id_employee: perfil.idFuncionario,
-    photo_url: perfil.foto || undefined,
-  };
-  const dto = await apiPatch<EmployeeDto>(EMPLOYEES.updateProfile(uid), payload);
-  return empleadoDtoToUserProfile(dto);
+  const payload: UpdateProfilePayload = { id_employee: input.idEmployee };
+  if (input.photoUrl !== undefined) payload.photo_url = input.photoUrl;
+  if (input.edad !== undefined) payload.age = input.edad;
+
+  // OJO: el endpoint /employees/updateUser/:id usa el `id_employee` numérico,
+  // no el supabase_user_id (a diferencia de getMyProfile/:id). El backend
+  // valida `Number(id) !== employeeId` y devuelve 403 si no coincide.
+  // El PATCH responde un subset (id_employee, email, age, photo_url). Para que
+  // el resto del UI no pierda nombre/cargo/área/manager, re-leemos el perfil
+  // completo después de guardar.
+  await apiPatch<unknown>(EMPLOYEES.updateProfile(input.idEmployee), payload);
+  return obtenerPerfilUsuario();
 }

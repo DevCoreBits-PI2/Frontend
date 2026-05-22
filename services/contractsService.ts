@@ -21,6 +21,8 @@ const TIPO_UI: Record<Contrato["tipo"], TipoContratoUI> = {
   INDEFINIDO: "Término Indefinido",
   SERVICIO: "Servicio",
   TIEMPO_PARCIAL: "Pasantía",
+  APRENDIZAJE: "Aprendizaje",
+  OBRA: "Obra o Labor",
 };
 
 const ESTADO_UI: Record<Contrato["estado"], EstadoContratoUI> = {

@@ -1,7 +1,7 @@
 // components/empleados/EmployeeProfileCard.tsx
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { MapPin, Calendar, MoreVertical, Plus } from "lucide-react";
 import { Empleado, EstadoEmpleado } from "@/services/empleadosService";
 import ChangeStatusModal from "@/components/empleados/ChangeStatusModal";
@@ -9,6 +9,16 @@ import RegisterWorkChangeModal from "@/components/empleados/RegisterWorkChangeMo
 import ToastNotification from "@/components/ToastNotification";
 import EditInfoModal from "@/components/perfil/EditInfoModal";
 import { Contrato, obtenerContratosPorEmpleado } from "@/services/contratosService";
+import { listarEvaluacionesPorEmpleado } from "@/services/evaluacionService";
+import {
+  crearEventoCarrera,
+  listarHistorialPorEmpleado,
+} from "@/services/carreraHistorialService";
+import type {
+  CareerHistoryDto,
+  CareerTypeChange,
+  PerformanceEvaluationDto,
+} from "@/types/api/career";
 import { PerformanceMain, PerformanceSidebar } from "@/components/perfil/PerformanceTab";
 
 interface Props {
@@ -72,46 +82,29 @@ function StatusToggle({ estado }: { estado: EstadoEmpleado }) {
 
 type TabActiva = "trayectoria" | "contratos" | "desempeño";
 
-interface TimelineEntry {
-  fecha: string;
-  titulo: string;
-  area: string;
-  descripcion: string;
-  icon: string;
-  badge?: string;
-}
+// Mismos labels que usa el perfil propio (UserProfileCard) para los tipos del backend.
+const CAREER_TYPE_LABEL: Record<string, string> = {
+  promotion: "Promoción",
+  transfer: "Traslado",
+  contract_modification: "Cambio de contrato",
+  salary_change: "Cambio salarial",
+  evaluation: "Evaluación",
+};
 
-const TIMELINE_INICIAL: TimelineEntry[] = [
-  {
-    fecha: "ENE 2024",
-    titulo: "Ascenso a Arquitecto Senior",
-    area: "CENTRO DE INGENIERÍA",
-    descripcion:
-      "Transición a rol de liderazgo supervisando proyectos de modernización de infraestructura cloud en regiones de Norteamérica.",
-    icon: "●",
-  },
-  {
-    fecha: "JUN 2021",
-    titulo: "Traslado a División Cloud",
-    area: "INFRAESTRUCTURA ESTRATÉGICA",
-    descripcion:
-      "Movimiento departamental alineado con la transición corporativa hacia arquitectura serverless.",
-    icon: "◆",
-  },
-  {
-    fecha: "MAR 2019",
-    titulo: "Ingreso como Desarrollador Junior",
-    area: "PLATAFORMAS CORE",
-    descripcion:
-      "Incorporación al programa de desarrollo para graduados enfocado en mantenimiento de sistemas legados.",
-    icon: "■",
-  },
-];
+// Mapeo entre los tipos UI del modal (RegisterWorkChangeModal) y los tipos
+// que acepta el backend en `CreateCareerHistoryPayload.type`.
+const UI_TIPO_TO_BACKEND: Record<string, CareerTypeChange> = {
+  traslado: "transfer",
+  ascenso: "promotion",
+  modificacion_contractual: "contract_modification",
+  cambio_salarial: "salary_change",
+};
 
-function formatFechaTimeline(iso: string): string {
+function formatCareerDate(iso: string): string {
   if (!iso) return "";
-  const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("en-US", { month: "short", year: "numeric" }).toUpperCase();
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("es-ES", { month: "short", year: "numeric" }).toUpperCase();
 }
 
 export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Props) {
@@ -121,7 +114,9 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
   const [modalCambioAbierto, setModalCambioAbierto] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMsg, setToastMsg] = useState({ title: "", message: "" });
-  const [timeline, setTimeline] = useState<TimelineEntry[]>(TIMELINE_INICIAL);
+  const [trayectoria, setTrayectoria] = useState<CareerHistoryDto[]>([]);
+  const [trayectoriaLoading, setTrayectoriaLoading] = useState(false);
+  const [trayectoriaError, setTrayectoriaError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Local editable state to reflect edits performed via modal
@@ -131,6 +126,9 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
   const [toastEditVisible, setToastEditVisible] = useState(false);
   const [contratos, setContratos] = useState<Contrato[]>([]);
+  const [evaluaciones, setEvaluaciones] = useState<PerformanceEvaluationDto[]>([]);
+  const [evaluacionesLoading, setEvaluacionesLoading] = useState(false);
+  const [evaluacionesError, setEvaluacionesError] = useState<string | null>(null);
 
   const iniciales = `${(nombreLocal || empleado.nombre).charAt(0)}${(apellidosLocal || empleado.apellidos).charAt(0)}`.toUpperCase();
 
@@ -152,6 +150,52 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
     });
     return () => { mounted = false; };
   }, [empleado.id]);
+
+  // Trayectoria real desde el backend (mismo endpoint que usa el perfil propio).
+  const fetchTrayectoria = useCallback(async () => {
+    setTrayectoriaLoading(true);
+    setTrayectoriaError(null);
+    try {
+      const data = await listarHistorialPorEmpleado(empleado.rawId, 1, 100);
+      setTrayectoria(data);
+    } catch {
+      setTrayectoriaError("No se pudo cargar la trayectoria del empleado.");
+    } finally {
+      setTrayectoriaLoading(false);
+    }
+  }, [empleado.rawId]);
+
+  useEffect(() => {
+    fetchTrayectoria();
+  }, [fetchTrayectoria]);
+
+  const trayectoriaOrdenada = useMemo(
+    () =>
+      [...trayectoria].sort(
+        (a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime(),
+      ),
+    [trayectoria],
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    setEvaluacionesLoading(true);
+    setEvaluacionesError(null);
+    listarEvaluacionesPorEmpleado(empleado.rawId, 1, 100)
+      .then((data) => {
+        if (!mounted) return;
+        setEvaluaciones(data);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setEvaluacionesError("No se pudieron cargar las evaluaciones.");
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setEvaluacionesLoading(false);
+      });
+    return () => { mounted = false; };
+  }, [empleado.rawId]);
 
   const handleConfirmarEstado = async (
     nuevoEstado: EstadoEmpleado,
@@ -304,32 +348,44 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                     Registrar Cambio Laboral
                   </button>
                 </div>
+
+                {trayectoriaLoading && (
+                  <p className="py-6 text-center text-sm text-[#8aa3ad]">
+                    Cargando trayectoria...
+                  </p>
+                )}
+                {trayectoriaError && (
+                  <p className="py-6 text-center text-sm text-rose-500">
+                    {trayectoriaError}
+                  </p>
+                )}
+                {!trayectoriaLoading && !trayectoriaError && trayectoriaOrdenada.length === 0 && (
+                  <p className="py-6 text-center text-sm text-[#8aa3ad]">
+                    Este empleado aún no tiene eventos registrados en su trayectoria.
+                  </p>
+                )}
+
                 <div className="space-y-8">
-                  {timeline.map((item, idx) => (
-                    <div key={idx} className="flex gap-6">
+                  {trayectoriaOrdenada.map((item, idx) => (
+                    <div key={item.id ?? item.id_record ?? idx} className="flex gap-6">
                       <div className="flex shrink-0 flex-col items-center">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#BDD5EA] text-sm font-bold text-[#203D47] shadow-sm">
-                          {item.icon}
+                          ●
                         </div>
-                        {idx < timeline.length - 1 && (
+                        {idx < trayectoriaOrdenada.length - 1 && (
                           <div className="mt-4 h-24 w-0.5 bg-[#d1dde2]" />
                         )}
                       </div>
                       <div className="flex-1 pb-4 pt-1">
                         <p className="text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">
-                          {item.fecha} · {item.area}
+                          {formatCareerDate(item.event_date)} · {CAREER_TYPE_LABEL[item.type] ?? item.type}
                         </p>
                         <h3 className="mt-2 text-base font-bold text-[#0F1819]">
-                          {item.titulo}
+                          {CAREER_TYPE_LABEL[item.type] ?? "Evento de carrera"}
                         </h3>
                         <p className="mt-2 text-sm leading-relaxed text-[#576975]">
-                          {item.descripcion}
+                          {item.description}
                         </p>
-                        {item.badge && (
-                          <span className="mt-2 inline-block text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-md px-2 py-0.5">
-                            {item.badge}
-                          </span>
-                        )}
                       </div>
                     </div>
                   ))}
@@ -369,13 +425,23 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
               </div>
             )}
 
-            {tabActiva === "desempeño" && <PerformanceMain />}
+            {tabActiva === "desempeño" && (
+              <PerformanceMain
+                evaluations={evaluaciones}
+                loading={evaluacionesLoading}
+                error={evaluacionesError}
+              />
+            )}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
             {tabActiva === "desempeño" ? (
-              <PerformanceSidebar />
+              <PerformanceSidebar
+                evaluations={evaluaciones}
+                loading={evaluacionesLoading}
+                error={evaluacionesError}
+              />
             ) : (
               <div className="rounded-xl bg-white p-6 shadow-sm border border-[#e4ebee]">
               <div className="mb-6 flex items-center gap-2 border-b border-[#f0f4f5] pb-4">
@@ -422,73 +488,68 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
         onConfirmar={handleConfirmarEstado}
       />
 
-      {/* Modal registro de cambio laboral */}
+      {/* Modal registro de cambio laboral — persiste vía POST /create-career-history. */}
       <RegisterWorkChangeModal
         isOpen={modalCambioAbierto}
         onCerrar={() => setModalCambioAbierto(false)}
         salarioActual={4_320_000}
         onGuardar={async (datos) => {
-          setModalCambioAbierto(false);
+          if (datos.tipo === "") return;
 
-          if (datos.tipo === "cambio_salarial") {
-            const signo = datos.tipoCambioSalarial === "aumento" ? "+" : "-";
-            const badge = `SALARY CHANGE: ${signo}${datos.porcentajeAjuste}%`;
-            setTimeline((prev) => [
-              {
-                fecha: formatFechaTimeline(datos.fechaEfectiva),
-                titulo: datos.tipoCambioSalarial === "aumento" ? "Salary Increase" : "Salary Decrease",
-                area: "SALARY MODIFICATION",
-                descripcion: datos.justificacion,
-                icon: datos.tipoCambioSalarial === "aumento" ? "↑" : "↓",
-                badge,
-              },
-              ...prev,
-            ]);
+          const backendType = UI_TIPO_TO_BACKEND[datos.tipo];
+          if (!backendType) {
             setToastMsg({
-              title: "Employee salary adjustment approved.",
-              message: `Salary ${datos.tipoCambioSalarial === "aumento" ? "increased" : "decreased"} by ${datos.porcentajeAjuste}% effective ${formatFechaTimeline(datos.fechaEfectiva)}.`,
+              title: "Tipo de cambio no soportado",
+              message: "El backend no acepta este tipo de evento de carrera.",
             });
-          } else {
-            const LABELS: Record<string, string> = {
-              traslado: "Transfer registered",
-              ascenso: "Promotion registered",
-              modificacion_contractual: "Contract modification registered",
-            };
-            setTimeline((prev) => [
-              {
-                fecha: formatFechaTimeline(datos.fechaEfectiva),
-                titulo: LABELS[datos.tipo] ?? "Work change registered",
-                area: datos.areaDestino ? datos.areaDestino.toUpperCase() : "GENERAL",
-                descripcion: datos.justificacion,
-                icon: datos.tipo === "ascenso" ? "▲" : datos.tipo === "traslado" ? "⇄" : "◉",
-              },
-              ...prev,
-            ]);
-            setToastMsg({
-              title: "Work change registered successfully.",
-              message: "The change has been added to the employee's labor history.",
-            });
+            setToastVisible(true);
+            return;
           }
 
-          setToastVisible(true);
+          // El backend exige `description` y `event_date`; armamos un texto
+          // resumen para los cambios salariales (que tienen porcentaje/signo).
+          let description = datos.justificacion.trim();
+          if (datos.tipo === "cambio_salarial") {
+            const signo = datos.tipoCambioSalarial === "aumento" ? "+" : "-";
+            description = `[${signo}${datos.porcentajeAjuste}%] ${description}`;
+          }
+
+          try {
+            await crearEventoCarrera({
+              description,
+              event_date: datos.fechaEfectiva,
+              type: backendType,
+              id_employee: empleado.rawId,
+            });
+            setModalCambioAbierto(false);
+            await fetchTrayectoria();
+            setToastMsg({
+              title: "Cambio laboral registrado",
+              message: "El evento se añadió a la trayectoria del empleado.",
+            });
+            setToastVisible(true);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "No se pudo registrar el cambio laboral.";
+            setToastMsg({ title: "Error", message: msg });
+            setToastVisible(true);
+          }
         }}
       />
 
-      {/* Edit Info Modal */}
+      {/* Edit Info Modal — la edición de otro empleado por un admin va por
+          /employees/updateEmployee (otra sección, distinto endpoint). Este
+          modal solo permite editar edad/foto; lo conservamos para mostrar la
+          info actual del empleado. La persistencia aquí se conectará cuando
+          atendamos la sección de empleados. */}
       <EditInfoModal
         isOpen={modalEditarAbierto}
         onClose={() => setModalEditarAbierto(false)}
-        initialData={{
+        readOnly={{
           fullName: `${nombreLocal} ${apellidosLocal}`.trim(),
-          phoneNumber: "",
           emailAddress: emailLocal,
         }}
-        onSave={async (data) => {
-          // Simular actualización: actualizar estado local y mostrar toast
-          const parts = data.fullName.trim().split(" ");
-          setNombreLocal(parts.shift() ?? "");
-          setApellidosLocal(parts.join(" ") ?? "");
-          setEmailLocal(data.emailAddress);
+        initialValues={{ edad: null, currentPhotoUrl: "" }}
+        onSave={async () => {
           setModalEditarAbierto(false);
           setToastEditVisible(true);
         }}

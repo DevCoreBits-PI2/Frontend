@@ -1,75 +1,120 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronUp, ChevronDown, TrendingUp } from "lucide-react";
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+import type { PerformanceEvaluationDto } from "@/types/api/career";
 
-const CHART_POINTS = [
-  { label: "Q3-2022", score: 3.5,  peer: 3.2  },
-  { label: "Q4-2022", score: 3.6,  peer: 3.25 },
-  { label: "Q1-2023", score: 3.7,  peer: 3.3  },
-  { label: "Q2-2023", score: 3.75, peer: 3.35 },
-  { label: "Q3-2023", score: 3.85, peer: 3.4  },
-  { label: "Q4-2023", score: 3.92, peer: 3.45 },
-  { label: "Q1-2024", score: 4.06, peer: 3.5  },
-];
+// ─── Mapping del backend ──────────────────────────────────────────────────────
+//
+// El microservicio de trajectory expone evaluaciones con 5 competencias:
+//   communication, technical_proficiency, leadership_influence, innovation, reliability
+// La UI las muestra con etiquetas en español.
 
-const EVALUATIONS = [
-  {
-    id: "1",
-    title: "Revisión Trimestral Q1 - 2024",
-    reviewer: "Sarah Chan",
-    date: "14 Mar, 2024",
-    score: 4.06,
-    isRecent: true,
-    competencies: [
-      { name: "Competencia Técnica Core",        score: 3.8 },
-      { name: "Liderazgo y Mentoría de Equipo",  score: 4.5 },
-      { name: "Innovación Estratégica",           score: 3.2 },
-      { name: "Impacto y Entrega",                score: 4.1 },
-      { name: "Confiabilidad y Apropiación",      score: 4.7 },
-    ],
-    observations:
-      '"Alex sigue siendo un pilar del equipo de infraestructura por su excepcional confiabilidad técnica. Su liderazgo durante la migración del Q1 fue clave. El enfoque para el Q2 debe ser una innovación arquitectónica más amplia y la alineación estratégica interdepartamental."',
-  },
-  {
-    id: "2",
-    title: "Auditoría de Desempeño Anual - 2023",
-    reviewer: "James Morton",
-    date: "20 Dic, 2023",
-    score: 3.92,
-    isRecent: false,
-    competencies: [],
-    observations: "",
-  },
-  {
-    id: "3",
-    title: "Revisión Trimestral Q3 - 2023",
-    reviewer: "Sarah Chan",
-    date: "15 Sep, 2023",
-    score: 3.85,
-    isRecent: false,
-    competencies: [],
-    observations: "",
-  },
-];
+const FIELDS = [
+  { key: "communication",         label: "Comunicación",          short: "COMU"  },
+  { key: "technical_proficiency", label: "Competencia Técnica",   short: "TÉC"   },
+  { key: "leadership_influence",  label: "Liderazgo e Influencia", short: "LIDER" },
+  { key: "innovation",            label: "Innovación",            short: "INNOV" },
+  { key: "reliability",           label: "Confiabilidad",         short: "CONF"  },
+] as const;
+
+type CompetencyKey = (typeof FIELDS)[number]["key"];
+
+interface NormalizedEvaluation {
+  id: string;
+  evaluationDate: string;
+  formattedDate: string;
+  reviewer: string;
+  observations: string;
+  scoresByField: Partial<Record<CompetencyKey, number>>;
+  averageScore: number;
+}
+
+function formatDateEs(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function getEvaluationId(dto: PerformanceEvaluationDto): number {
+  return dto.id ?? dto.id_evaluation ?? 0;
+}
+
+// El endpoint `find-performance-evaluations-by-employee/:id` del backend
+// devuelve filas de `career_history` con la evaluación anidada en
+// `performance_evaluations`. Otros endpoints devuelven la evaluación "plana".
+// Esta función reconoce ambas formas: si viene anidada, usamos los campos
+// internos para puntajes/fecha del evaluador, y los del exterior como fallback.
+type WrappedEvaluationDto = PerformanceEvaluationDto & {
+  performance_evaluations?: PerformanceEvaluationDto | null;
+  event_date?: string;
+};
+
+function unwrapEvaluation(dto: WrappedEvaluationDto): PerformanceEvaluationDto {
+  if (dto.performance_evaluations) {
+    const inner = dto.performance_evaluations;
+    return {
+      ...inner,
+      // Si la evaluación interna no tiene fecha, caemos a la del career_history.
+      evaluation_date: inner.evaluation_date ?? dto.event_date ?? dto.evaluation_date,
+    };
+  }
+  return dto;
+}
+
+function normalizeEvaluation(rawDto: WrappedEvaluationDto): NormalizedEvaluation {
+  const dto = unwrapEvaluation(rawDto);
+  const scoresByField: Partial<Record<CompetencyKey, number>> = {};
+  let sum = 0;
+  let count = 0;
+  for (const { key } of FIELDS) {
+    const v = (dto as unknown as Record<string, unknown>)[key];
+    if (typeof v === "number") {
+      scoresByField[key] = v;
+      sum += v;
+      count += 1;
+    }
+  }
+  return {
+    id: String(getEvaluationId(dto)),
+    evaluationDate: dto.evaluation_date,
+    formattedDate: formatDateEs(dto.evaluation_date),
+    reviewer: `Director ID ${dto.id_director}`,
+    observations: dto.observations ?? "",
+    scoresByField,
+    averageScore: count > 0 ? Number((sum / count).toFixed(2)) : 0,
+  };
+}
 
 // ─── Line Chart ───────────────────────────────────────────────────────────────
 
-function PerformanceLineChart() {
+function PerformanceLineChart({ points }: { points: { label: string; score: number }[] }) {
   const W = 560, H = 130;
   const PAD = { top: 10, bottom: 28, left: 15, right: 15 };
   const chartW = W - PAD.left - PAD.right;
   const chartH = H - PAD.top - PAD.bottom;
-  const minY = 2.8, maxY = 4.6;
-  const n = CHART_POINTS.length;
+  const n = points.length;
 
-  const toX = (i: number) => PAD.left + (i / (n - 1)) * chartW;
-  const toY = (v: number) => PAD.top + chartH - ((v - minY) / (maxY - minY)) * chartH;
+  if (n === 0) {
+    return (
+      <div className="flex h-[130px] items-center justify-center text-xs text-[#8aa3ad]">
+        Sin datos de evaluaciones para graficar.
+      </div>
+    );
+  }
 
-  const scorePath = CHART_POINTS.map((p, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(p.score).toFixed(1)}`).join(" ");
-  const peerPath  = CHART_POINTS.map((p, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(p.peer).toFixed(1)}`).join(" ");
+  const scores = points.map((p) => p.score);
+  const minY = Math.max(0, Math.min(...scores) - 0.3);
+  const maxY = Math.min(5, Math.max(...scores) + 0.3);
+  const denomY = maxY - minY || 1;
+  const denomX = n - 1 || 1;
+
+  const toX = (i: number) => PAD.left + (i / denomX) * chartW;
+  const toY = (v: number) => PAD.top + chartH - ((v - minY) / denomY) * chartH;
+
+  const scorePath = points.map((p, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(p.score).toFixed(1)}`).join(" ");
   const areaPath  = `${scorePath} L${toX(n - 1).toFixed(1)},${(PAD.top + chartH).toFixed(1)} L${toX(0).toFixed(1)},${(PAD.top + chartH).toFixed(1)} Z`;
 
   return (
@@ -81,21 +126,20 @@ function PerformanceLineChart() {
         </linearGradient>
       </defs>
 
-      {[3.0, 3.5, 4.0, 4.5].map((v) => (
+      {[1, 2, 3, 4, 5].filter((v) => v >= minY && v <= maxY).map((v) => (
         <line key={v} x1={PAD.left} y1={toY(v)} x2={W - PAD.right} y2={toY(v)} stroke="#f0f4f5" strokeWidth="1" />
       ))}
 
       <path d={areaPath}  fill="url(#perf-area)" />
-      <path d={peerPath}  fill="none" stroke="#c5d5db" strokeWidth="1.5" strokeDasharray="4,3" />
       <path d={scorePath} fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
 
       <circle
         cx={toX(n - 1).toFixed(1)}
-        cy={toY(CHART_POINTS[n - 1].score).toFixed(1)}
+        cy={toY(points[n - 1].score).toFixed(1)}
         r="3.5" fill="#10b981"
       />
 
-      {CHART_POINTS.map((p, i) => (
+      {points.map((p, i) => (
         <text key={i} x={toX(i)} y={H - 6} textAnchor="middle" fontSize="8" fill="#8aa3ad" fontFamily="sans-serif">
           {p.label}
         </text>
@@ -106,12 +150,16 @@ function PerformanceLineChart() {
 
 // ─── Radar Chart ──────────────────────────────────────────────────────────────
 
-function RadarChart() {
+function RadarChart({ scores }: { scores: Partial<Record<CompetencyKey, number>> }) {
   const cx = 90, cy = 82, R = 55;
-  const labels = ["CORE", "LIDER", "ESTRAT", "IMPACTO", "PROP"];
-  const values  = [0.76,   0.90,   0.64,    0.82,      0.94];
+  const labels = FIELDS.map((f) => f.short);
+  // Normalizamos a [0,1] sobre la escala 0..5 del backend.
+  const values = FIELDS.map((f) => {
+    const v = scores[f.key];
+    return typeof v === "number" ? Math.max(0, Math.min(1, v / 5)) : 0;
+  });
 
-  const angle = (i: number) => ((90 - i * 72) * Math.PI) / 180;
+  const angle = (i: number) => ((90 - i * (360 / labels.length)) * Math.PI) / 180;
   const pt = (i: number, scale = 1) => ({
     x: cx + R * scale * Math.cos(angle(i)),
     y: cy - R * scale * Math.sin(angle(i)),
@@ -158,7 +206,7 @@ function CompetencyBar({ name, score }: { name: string; score: number }) {
     <div>
       <div className="flex justify-between text-xs mb-1">
         <span className="text-[#203D47]">{name}</span>
-        <span className="text-[#8aa3ad] font-medium">{score}/5</span>
+        <span className="text-[#8aa3ad] font-medium">{score.toFixed(2)}/5</span>
       </div>
       <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
@@ -167,14 +215,61 @@ function CompetencyBar({ name, score }: { name: string; score: number }) {
   );
 }
 
+// ─── Helpers públicos ─────────────────────────────────────────────────────────
+
+export function sortEvaluationsByDateAsc(items: PerformanceEvaluationDto[]): NormalizedEvaluation[] {
+  return items
+    .map((dto) => normalizeEvaluation(dto as WrappedEvaluationDto))
+    .sort((a, b) => new Date(a.evaluationDate).getTime() - new Date(b.evaluationDate).getTime());
+}
+
 // ─── Public exports ───────────────────────────────────────────────────────────
 
-export function PerformanceMain() {
-  const [expanded, setExpanded] = useState<string | null>("1");
+interface PerformanceProps {
+  evaluations: PerformanceEvaluationDto[];
+  loading?: boolean;
+  error?: string | null;
+}
+
+export function PerformanceMain({ evaluations, loading, error }: PerformanceProps) {
+  const asc = useMemo(() => sortEvaluationsByDateAsc(evaluations), [evaluations]);
+  const desc = useMemo(() => [...asc].reverse(), [asc]);
+  const chartPoints = useMemo(
+    () => asc.map((e) => ({
+      label: e.formattedDate.replace(",", "").split(" ").slice(1).join(" "),
+      score: e.averageScore,
+    })),
+    [asc],
+  );
+
+  const [expanded, setExpanded] = useState<string | null>(desc[0]?.id ?? null);
+
+  if (loading) {
+    return (
+      <div className="rounded-xl bg-white p-8 shadow-sm text-center text-sm text-[#8aa3ad]">
+        Cargando evaluaciones...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-rose-200 bg-white p-8 text-center text-sm text-rose-500">
+        {error}
+      </div>
+    );
+  }
+
+  if (desc.length === 0) {
+    return (
+      <div className="rounded-xl bg-white p-8 shadow-sm text-center text-sm text-[#8aa3ad]">
+        No hay evaluaciones registradas todavía.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      {/* Performance Over Time */}
       <div className="rounded-xl bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-bold uppercase tracking-widest text-[#0F1819]">
@@ -183,18 +278,13 @@ export function PerformanceMain() {
           <div className="flex items-center gap-4 text-[10px] text-[#8aa3ad]">
             <span className="flex items-center gap-1.5">
               <span className="inline-block w-4 h-0.5 rounded bg-emerald-500" />
-              Puntuación General
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-4 h-0.5 rounded" style={{ background: "repeating-linear-gradient(90deg,#c5d5db 0,#c5d5db 3px,transparent 3px,transparent 6px)" }} />
-              Promedio de Pares
+              Puntuación promedio
             </span>
           </div>
         </div>
-        <PerformanceLineChart />
+        <PerformanceLineChart points={chartPoints} />
       </div>
 
-      {/* Evaluation History */}
       <div className="rounded-xl bg-white shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 border-b border-[#f0f4f5]">
           <h2 className="text-xs font-bold uppercase tracking-widest text-[#0F1819]">
@@ -202,134 +292,132 @@ export function PerformanceMain() {
           </h2>
         </div>
 
-        {EVALUATIONS.map((ev) => (
-          <div key={ev.id} className="border-b border-[#f0f4f5] last:border-b-0">
-            {/* Row */}
-            <button
-              className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-[#fafcfc] transition-colors text-left"
-              onClick={() => setExpanded(expanded === ev.id ? null : ev.id)}
-            >
-              {/* Icon */}
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${ev.isRecent ? "bg-emerald-100" : "bg-gray-100"}`}>
-                {ev.isRecent ? (
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                ) : (
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8aa3ad" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-                  </svg>
-                )}
-              </div>
-
-              {/* Title */}
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-semibold text-[#0F1819] truncate">{ev.title}</p>
-                <p className="text-xs text-[#8aa3ad]">por {ev.reviewer} · {ev.date}</p>
-              </div>
-
-              {/* Score */}
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="text-right">
-                  <p className="text-base font-bold text-[#0F1819] leading-none">{ev.score.toFixed(2)}</p>
-                  <p className="text-[9px] uppercase tracking-widest text-[#8aa3ad] mt-0.5">Puntuación Ponderada</p>
+        {desc.map((ev, idx) => {
+          const isLatest = idx === 0;
+          const competencies = FIELDS.filter((f) => typeof ev.scoresByField[f.key] === "number");
+          return (
+            <div key={ev.id} className="border-b border-[#f0f4f5] last:border-b-0">
+              <button
+                className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-[#fafcfc] transition-colors text-left"
+                onClick={() => setExpanded(expanded === ev.id ? null : ev.id)}
+              >
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isLatest ? "bg-emerald-100" : "bg-gray-100"}`}>
+                  {isLatest ? (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8aa3ad" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                    </svg>
+                  )}
                 </div>
-                {expanded === ev.id
-                  ? <ChevronUp size={14} className="text-[#8aa3ad]" />
-                  : <ChevronDown size={14} className="text-[#8aa3ad]" />
-                }
-              </div>
-            </button>
 
-            {/* Expanded detail */}
-            {expanded === ev.id && ev.competencies.length > 0 && (
-              <div className="grid grid-cols-2 gap-5 px-5 pb-5 pt-4 bg-[#fafcfc] border-t border-[#f0f4f5]">
-                <div>
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-[#8aa3ad] mb-3">
-                    Desglose de Competencias
-                  </p>
-                  <div className="space-y-3">
-                    {ev.competencies.map((c) => <CompetencyBar key={c.name} {...c} />)}
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-sm font-semibold text-[#0F1819] truncate">Evaluación · {ev.formattedDate}</p>
+                  <p className="text-xs text-[#8aa3ad]">por {ev.reviewer}</p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="text-right">
+                    <p className="text-base font-bold text-[#0F1819] leading-none">{ev.averageScore.toFixed(2)}</p>
+                    <p className="text-[9px] uppercase tracking-widest text-[#8aa3ad] mt-0.5">Puntuación Promedio</p>
+                  </div>
+                  {expanded === ev.id
+                    ? <ChevronUp size={14} className="text-[#8aa3ad]" />
+                    : <ChevronDown size={14} className="text-[#8aa3ad]" />
+                  }
+                </div>
+              </button>
+
+              {expanded === ev.id && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 px-5 pb-5 pt-4 bg-[#fafcfc] border-t border-[#f0f4f5]">
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-[#8aa3ad] mb-3">
+                      Desglose de Competencias
+                    </p>
+                    {competencies.length > 0 ? (
+                      <div className="space-y-3">
+                        {competencies.map((f) => (
+                          <CompetencyBar key={f.key} name={f.label} score={ev.scoresByField[f.key] as number} />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-[#8aa3ad]">Sin competencias registradas.</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-[#8aa3ad] mb-3">
+                      Observaciones
+                    </p>
+                    <p className="text-xs text-[#203D47] leading-relaxed italic">
+                      {ev.observations || "Sin observaciones."}
+                    </p>
                   </div>
                 </div>
-                <div>
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-[#8aa3ad] mb-3">
-                    Observaciones del Auditor
-                  </p>
-                  <p className="text-xs text-[#203D47] leading-relaxed italic">{ev.observations}</p>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-export function PerformanceSidebar() {
+export function PerformanceSidebar({ evaluations }: PerformanceProps) {
+  const asc = useMemo(() => sortEvaluationsByDateAsc(evaluations), [evaluations]);
+  const latest = asc[asc.length - 1];
+  const previous = asc[asc.length - 2];
+
+  if (!latest) {
+    return (
+      <div className="rounded-xl bg-white p-5 shadow-sm text-center text-xs text-[#8aa3ad]">
+        Aún no hay evaluaciones.
+      </div>
+    );
+  }
+
+  const deltaPct = previous && previous.averageScore > 0
+    ? ((latest.averageScore - previous.averageScore) / previous.averageScore) * 100
+    : null;
+  const trendUp = (deltaPct ?? 0) >= 0;
+
   return (
     <div className="space-y-4">
-      {/* Latest Audit Result */}
       <div className="rounded-xl bg-[#0F1819] p-5 text-white relative overflow-hidden">
         <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full bg-white/5" />
         <div className="absolute -left-4 -bottom-4 w-14 h-14 rounded-full bg-white/5" />
 
         <div className="relative">
           <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-3">
-            Última Auditoría
+            Última Evaluación
           </p>
 
           <div className="flex items-end gap-1.5 mb-1">
-            <span className="text-4xl font-extrabold leading-none">4.06</span>
+            <span className="text-4xl font-extrabold leading-none">{latest.averageScore.toFixed(2)}</span>
             <span className="text-sm text-white/50 mb-1">/5.0</span>
           </div>
 
-          <div className="flex items-center gap-1 mb-3">
-            <TrendingUp size={11} className="text-emerald-400" />
-            <span className="text-[10px] font-bold text-emerald-400">+3.5% VS PERÍODO ANTERIOR</span>
-          </div>
-
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {["SUPERA OBJETIVOS", "ALTA CONFIANZA"].map((tag) => (
-              <span key={tag} className="text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded">
-                {tag}
+          {deltaPct !== null && (
+            <div className="flex items-center gap-1 mb-3">
+              <TrendingUp size={11} className={trendUp ? "text-emerald-400" : "text-rose-400"} />
+              <span className={`text-[10px] font-bold ${trendUp ? "text-emerald-400" : "text-rose-400"}`}>
+                {trendUp ? "+" : ""}{deltaPct.toFixed(1)}% vs evaluación anterior
               </span>
-            ))}
-            <span className="text-[9px] font-bold border border-white/20 text-white/60 px-2 py-0.5 rounded">
-              TOP TIER
-            </span>
-          </div>
+            </div>
+          )}
 
           <p className="text-[10px] text-white/50 leading-relaxed">
-            Alex se encuentra actualmente en el percentil 94 de Arquitectos Senior dentro de la División de Ingeniería.
+            Realizada el {latest.formattedDate}.
           </p>
         </div>
       </div>
 
-      {/* Competency Profile */}
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <p className="text-[9px] font-bold uppercase tracking-widest text-[#8aa3ad] mb-1">
           Perfil de Competencias
         </p>
-        <RadarChart />
-        <button className="w-full text-center text-[9px] font-bold uppercase tracking-widest text-[#8aa3ad] hover:text-[#203D47] transition-colors mt-1">
-          Ver Métricas Detalladas
-        </button>
-      </div>
-
-      {/* Leadership Insights */}
-      <div className="rounded-xl bg-white p-4 shadow-sm">
-        <p className="text-[9px] font-bold uppercase tracking-widest text-[#8aa3ad] mb-3">
-          Insights de Liderazgo
-        </p>
-        <div className="flex items-start gap-3">
-          <span className="text-2xl font-extrabold text-emerald-500 leading-none">4</span>
-          <div>
-            <p className="text-sm font-semibold text-[#0F1819]">Mentees Activos</p>
-            <p className="text-xs text-[#8aa3ad] leading-snug">Alto feedback de pares por compartir conocimiento</p>
-          </div>
-        </div>
+        <RadarChart scores={latest.scoresByField} />
       </div>
     </div>
   );

@@ -50,19 +50,23 @@ interface ContratosTableProps {
 
 function obtenerIconoTipo(tipo: TipoContrato) {
   switch (tipo) {
-    case "INDEFINIDO":   return { icon: ShieldCheck,  color: "text-emerald-500" };
-    case "FIJO":         return { icon: CalendarClock, color: "text-sky-500"    };
-    case "SERVICIO":     return { icon: CircleSlash,   color: "text-slate-400"  };
-    case "TIEMPO_PARCIAL": return { icon: CalendarX2,  color: "text-amber-500"  };
+    case "INDEFINIDO":     return { icon: ShieldCheck,  color: "text-emerald-500" };
+    case "FIJO":           return { icon: CalendarClock, color: "text-sky-500"    };
+    case "SERVICIO":       return { icon: CircleSlash,   color: "text-slate-400"  };
+    case "TIEMPO_PARCIAL": return { icon: CalendarX2,   color: "text-amber-500"  };
+    case "APRENDIZAJE":    return { icon: CalendarClock, color: "text-violet-500" };
+    case "OBRA":           return { icon: CalendarX2,   color: "text-orange-500" };
   }
 }
 
 function etiquetaTipo(tipo: TipoContrato): string {
   switch (tipo) {
-    case "INDEFINIDO":    return "Término Indefinido";
-    case "FIJO":          return "Término Fijo";
-    case "SERVICIO":      return "Contrato de Servicios";
-    case "TIEMPO_PARCIAL":return "Tiempo Parcial";
+    case "INDEFINIDO":     return "Término Indefinido";
+    case "FIJO":           return "Término Fijo";
+    case "SERVICIO":       return "Prestación de Servicios";
+    case "TIEMPO_PARCIAL": return "Temporal";
+    case "APRENDIZAJE":    return "Aprendizaje";
+    case "OBRA":           return "Obra o Labor";
   }
 }
 
@@ -134,11 +138,11 @@ function downloadPdf(c: Contrato) {
   </div>
   <div class="grid">
     <div class="field"><label>Tipo de Contrato</label><p>${etiquetaTipo(c.tipo)}</p></div>
-    <div class="field"><label>Salario Base</label><p>${c.salarioBase.toLocaleString("es-ES", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}</p></div>
+    <div class="field"><label>Estado</label><p>${badgeEstado(c.estado).label}</p></div>
     <div class="field"><label>Fecha de Inicio</label><p>${formatFecha(c.fechaInicio)}</p></div>
     <div class="field"><label>Fecha de Fin</label><p>${formatFecha(c.fechaFin)}</p></div>
     <div class="field"><label>Fecha de Registro</label><p>${formatFecha(c.creadoEn)}</p></div>
-    <div class="field"><label>Estado</label><p>${badgeEstado(c.estado).label}</p></div>
+    <div class="field"><label>ID de Empleado</label><p>${c.idEmpleado}</p></div>
   </div>
   ${c.notas ? `<div class="notes">"${c.notas}"</div>` : ""}
   <div class="footer">Generado el ${new Date().toLocaleDateString("es-ES", { month: "long", day: "2-digit", year: "numeric" })} · Sistema de Gestión de RRHH</div>

@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Briefcase, Building2, GitBranch, BadgeCheck } from "lucide-react";
+import { X, Briefcase, Building2 } from "lucide-react";
 import { Position, editarPosicion } from "@/services/positionsService";
+import { Area } from "@/services/areasService";
 
 interface EditPositionModalProps {
   isOpen: boolean;
   position: Position | null;
+  areas: Area[];
+  parentOptions: Position[];
   onClose: () => void;
   onSuccess?: (position: Position) => void;
 }
@@ -14,22 +17,32 @@ interface EditPositionModalProps {
 export default function EditPositionModal({
   isOpen,
   position,
+  areas,
+  parentOptions,
   onClose,
   onSuccess,
 }: EditPositionModalProps) {
   const [nombre, setNombre] = useState("");
-  const [posicionSuperior, setPosicionSuperior] = useState("");
-  const [areaId, setAreaId] = useState("");
-  const [estado, setEstado] = useState<"Active" | "Drafting">("Active");
+  const [description, setDescription] = useState("");
+  const [posicionSuperiorId, setPosicionSuperiorId] = useState<string>("");
+  const [areaIdNum, setAreaIdNum] = useState<string>("");
+  const [estado, setEstado] = useState<"Active" | "Inactive">("Active");
+  const [vacancies, setVacancies] = useState<string>("1");
+  const [baseSalary, setBaseSalary] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (position) {
       setNombre(position.nombre);
-      setPosicionSuperior(position.posicionSuperior || "");
-      setAreaId(position.areaId);
+      setDescription(position.description ?? "");
+      setPosicionSuperiorId(
+        position.posicionSuperiorId != null ? String(position.posicionSuperiorId) : "",
+      );
+      setAreaIdNum(String(position.areaIdNumber));
       setEstado(position.estado);
+      setVacancies(String(position.vacancies ?? 1));
+      setBaseSalary(position.baseSalary != null ? String(position.baseSalary) : "");
       setError("");
     }
   }, [position, isOpen]);
@@ -41,15 +54,34 @@ export default function EditPositionModal({
 
     try {
       if (!position) throw new Error("No position selected");
-      if (!nombre.trim()) {
-        throw new Error("El nombre de la posición es obligatorio.");
+      if (!nombre.trim()) throw new Error("El nombre de la posición es obligatorio.");
+      if (!description.trim()) throw new Error("La descripción es obligatoria.");
+      if (!areaIdNum) throw new Error("Selecciona un área.");
+
+      const vacN = Number(vacancies);
+      if (!Number.isInteger(vacN) || vacN < 1) {
+        throw new Error("Vacantes debe ser un entero ≥ 1.");
+      }
+      let salaryN: number | undefined;
+      if (baseSalary.trim()) {
+        const n = Number(baseSalary);
+        if (Number.isNaN(n) || n < 0) throw new Error("El salario base debe ser ≥ 0.");
+        salaryN = n;
+      }
+
+      // Evita un ciclo trivial donde el padre seleccionado es la posición misma.
+      if (posicionSuperiorId && Number(posicionSuperiorId) === position.rawId) {
+        throw new Error("Una posición no puede ser su propia superior.");
       }
 
       const posicionActualizada = await editarPosicion(position.id, {
         nombre: nombre.trim(),
-        posicionSuperior: posicionSuperior || null,
+        description: description.trim(),
+        areaIdNumber: Number(areaIdNum),
+        posicionSuperiorId: posicionSuperiorId ? Number(posicionSuperiorId) : null,
         estado,
-        areaId,
+        vacancies: vacN,
+        baseSalary: salaryN,
       });
 
       onSuccess?.(posicionActualizada);
@@ -68,11 +100,14 @@ export default function EditPositionModal({
       hasError ? "border-red-400 bg-red-50" : "border-[#e8eef0]"
     }`;
 
+  // Filtramos la propia posición de la lista de posibles padres.
+  const posiblesPadres = parentOptions.filter((p) => p.rawId !== position.rawId);
+
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50">
       <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" />
 
-      <div className="relative z-50 w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl mx-4">
+      <div className="relative z-50 w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center gap-3 border-b border-[#edf2f3] px-5 py-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0F1819] text-white">
             <Briefcase size={18} />
@@ -99,7 +134,7 @@ export default function EditPositionModal({
                 type="text"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                className={inputClass(!!error)}
+                className={inputClass()}
                 disabled={loading}
                 placeholder="Senior Architect"
               />
@@ -109,52 +144,100 @@ export default function EditPositionModal({
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-widest text-[#8aa3ad]">
+              Descripción *
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className={inputClass()}
+              disabled={loading}
+              placeholder="Responsabilidades, requisitos, etc."
+              rows={3}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-[#8aa3ad]">
               Posición superior
             </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={posicionSuperior}
-                onChange={(e) => setPosicionSuperior(e.target.value)}
+            <select
+              value={posicionSuperiorId}
+              onChange={(e) => setPosicionSuperiorId(e.target.value)}
+              className={inputClass()}
+              disabled={loading}
+            >
+              <option value="">(Sin posición superior)</option>
+              {posiblesPadres.map((p) => (
+                <option key={p.id} value={String(p.rawId)}>
+                  {p.nombre} — {p.areaNombre || "sin área"}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-widest text-[#8aa3ad]">
+                Área *
+              </label>
+              <select
+                value={areaIdNum}
+                onChange={(e) => setAreaIdNum(e.target.value)}
                 className={inputClass()}
                 disabled={loading}
-                placeholder="Engineering Manager"
-              />
-              <GitBranch size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8aa3ad]" />
+              >
+                {areas.length === 0 && <option value="">— Sin áreas —</option>}
+                {areas.map((a) => (
+                  <option key={a.id} value={a.id}>{a.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-widest text-[#8aa3ad]">
+                Estado
+              </label>
+              <select
+                value={estado}
+                onChange={(e) => setEstado(e.target.value as "Active" | "Inactive")}
+                className={inputClass()}
+                disabled={loading}
+              >
+                <option value="Active">Activa</option>
+                <option value="Inactive">Inactiva</option>
+              </select>
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-[#8aa3ad]">
-              Estado
-            </label>
-            <select
-              value={estado}
-              onChange={(e) => setEstado(e.target.value as "Active" | "Drafting")}
-              className={inputClass()}
-              disabled={loading}
-            >
-              <option value="Active">Activa</option>
-              <option value="Drafting">Borrador</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-[#8aa3ad]">
-              Área
-            </label>
-            <select
-              value={areaId}
-              onChange={(e) => setAreaId(e.target.value)}
-              className={inputClass()}
-              disabled={loading}
-            >
-              <option value="area-1">Tecnología</option>
-              <option value="area-2">Seguridad</option>
-              <option value="area-3">Producto</option>
-              <option value="area-4">Diseño</option>
-              <option value="area-5">Datos</option>
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-widest text-[#8aa3ad]">
+                Vacantes *
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={vacancies}
+                onChange={(e) => setVacancies(e.target.value)}
+                className={inputClass()}
+                disabled={loading}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-widest text-[#8aa3ad]">
+                Salario base
+              </label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={baseSalary}
+                onChange={(e) => setBaseSalary(e.target.value)}
+                placeholder="Opcional"
+                className={inputClass()}
+                disabled={loading}
+              />
+            </div>
           </div>
 
           {error && <div className="text-red-600 text-sm font-medium">{error}</div>}

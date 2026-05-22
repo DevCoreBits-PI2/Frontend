@@ -1,21 +1,26 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import toast from "react-hot-toast";
-import { Check, X } from "lucide-react";
-import { getPositions, buildPositionTree } from "@/services/orgChartService";
+import { Check, X, ChevronRight, ChevronDown, Filter } from "lucide-react";
+import { getPositions, buildPositionForest } from "@/services/orgChartService";
 import { Position, PositionTree } from "@/types/orgChart";
 import OrgTree from "@/components/org-chart/OrgTree";
 import PositionDetailPanel from "@/components/org-chart/AreaDetailsPanel";
 import HierarchyModal from "@/components/org-chart/HierarchyModal";
 import ErrorModal from "@/components/org-chart/ErrorModal";
 import DetachConfirmModal from "@/components/org-chart/DetachConfirmModal";
-import { ChevronRight, ChevronDown, Filter, Clock, Save } from "lucide-react";
+import { obtenerAreas, type Area } from "@/services/areasService";
+import {
+  crearPosicion,
+  editarPosicion,
+  eliminarJerarquiaPadre,
+} from "@/services/positionsService";
+import { useAuth } from "@/lib/auth/AuthContext";
 
-const DEPARTMENTS = ["Departamento de Ingeniería", "Departamento de Marketing", "Departamento de Operaciones"];
+const ALL_AREAS_VALUE = "__ALL__";
 
-// Toast helpers
-function toastSuccess() {
+function toastSuccess(message = "Cambios aplicados") {
   toast.custom(
     (t) => (
       <div
@@ -27,8 +32,7 @@ function toastSuccess() {
           <Check size={15} className="text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[#0F1819] font-bold text-sm">Jerarquía exitosa</p>
-          <p className="text-[#8aa3ad] text-xs mt-0.5">La nueva jerarquía fue implementada</p>
+          <p className="text-[#0F1819] font-bold text-sm">{message}</p>
         </div>
         <button
           onClick={() => toast.dismiss(t.id)}
@@ -38,19 +42,19 @@ function toastSuccess() {
         </button>
       </div>
     ),
-    { position: "top-right", duration: 4000 }
+    { position: "top-right", duration: 3500 }
   );
 }
 
-function toastDetached() {
+function toastError(message: string) {
   toast.custom(
     (t) => (
       <div
-        className={`bg-rose-500 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center justify-between gap-3 max-w-[320px] transition-opacity ${
+        className={`bg-rose-500 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center justify-between gap-3 max-w-[360px] transition-opacity ${
           t.visible ? "opacity-100" : "opacity-0"
         }`}
       >
-        <span className="text-sm font-semibold">Relación jerárquica eliminada</span>
+        <span className="text-sm font-semibold">{message}</span>
         <button
           onClick={() => toast.dismiss(t.id)}
           className="text-white/80 hover:text-white transition-colors shrink-0"
@@ -59,26 +63,28 @@ function toastDetached() {
         </button>
       </div>
     ),
-    { position: "top-right", duration: 3500 }
+    { position: "top-right", duration: 4500 }
   );
 }
 
 export default function PositionHierarchyPage() {
-  const [tree, setTree] = useState<PositionTree | null>(null);
+  const { authUser } = useAuth();
+  const [areas, setAreas] = useState<Area[]>([]);
   const [allPositions, setAllPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Position | null>(null);
-  const [department, setDepartment] = useState(DEPARTMENTS[0]);
+
+  const [areaFilter, setAreaFilter] = useState<string>(ALL_AREAS_VALUE);
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
   const [scale, setScale] = useState(0.9);
-  const [lastSaved, setLastSaved] = useState("Hoy a las 10:42");
 
-  // Editable panel state (lifted up so Save/Discard can control)
-  const [editSuperior, setEditSuperior] = useState("");
+  // Estado del panel lateral. `editSuperiorId` es el id (string del numérico)
+  // de la posición seleccionada como nuevo superior, o "" para "sin superior".
+  const [editSuperiorId, setEditSuperiorId] = useState<string>("");
   const [editReports, setEditReports] = useState<string[]>([]);
+  const [savingSuperior, setSavingSuperior] = useState(false);
 
-  // Modal states
   const [addParent, setAddParent] = useState<Position | null>(null);
   const [editPos, setEditPos] = useState<Position | null>(null);
   const [detachPos, setDetachPos] = useState<Position | null>(null);
@@ -88,89 +94,107 @@ export default function PositionHierarchyPage() {
     ctx: Position;
   } | null>(null);
 
-  useEffect(() => {
-    getPositions()
-      .then((positions) => {
-        setAllPositions(positions);
-        setTree(buildPositionTree(positions));
-      })
-      .catch(() => setError("No se pudo cargar la jerarquía."))
-      .finally(() => setLoading(false));
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [positions, areasReales] = await Promise.all([
+        getPositions(),
+        obtenerAreas(),
+      ]);
+      setAllPositions(positions);
+      setAreas(areasReales);
+    } catch {
+      setError("No se pudo cargar la jerarquía.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // ── Selection ──────────────────────────────────────────────────
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  // Posiciones filtradas por área seleccionada. Como `area` viene como el
+  // *nombre*, comparamos por nombre. ALL_AREAS_VALUE → sin filtro.
+  const positionsFiltradas = useMemo(() => {
+    if (areaFilter === ALL_AREAS_VALUE) return allPositions;
+    const areaSeleccionada = areas.find((a) => a.id === areaFilter);
+    if (!areaSeleccionada) return allPositions;
+    return allPositions.filter((p) => p.department === areaSeleccionada.nombre);
+  }, [allPositions, areas, areaFilter]);
+
+  const forest = useMemo(
+    () => buildPositionForest(positionsFiltradas),
+    [positionsFiltradas],
+  );
+
+  // ── Selección ──────────────────────────────────────────────────────────
   const handleSelect = useCallback((pos: Position) => {
     setSelected((prev) => {
       if (prev?.id === pos.id) {
-        setEditSuperior("");
+        setEditSuperiorId("");
         setEditReports([]);
         return null;
       }
-      setAllPositions((current) => {
-        const saved = current.find((p) => p.id === pos.id) ?? pos;
-        setEditSuperior(saved.superiorName ?? "");
-        setEditReports(saved.directReportNames);
-        return current;
-      });
+      setEditSuperiorId(pos.parentId ?? "");
+      setEditReports(pos.directReportNames);
       return pos;
     });
   }, []);
 
   const handleClose = useCallback(() => {
     setSelected(null);
-    setEditSuperior("");
+    setEditSuperiorId("");
     setEditReports([]);
   }, []);
 
-  // ── Panel Save / Discard ───────────────────────────────────────
-  const handleDiscard = () => {
-    if (selected) {
-      setEditSuperior(selected.superiorName ?? "");
-      setEditReports(selected.directReportNames);
+  // ── Guardar nueva posición superior ────────────────────────────────────
+  // Persistimos parent_position_id vía PATCH editarPosicion. Pasar `null`
+  // limpia la jerarquía (equivalente a desvincular).
+  const handleSaveSuperior = useCallback(async () => {
+    if (!selected) return;
+    const newParentId = editSuperiorId === "" ? null : Number(editSuperiorId);
+    if (newParentId !== null && Number.isNaN(newParentId)) {
+      toastError("ID de superior inválido.");
+      return;
     }
-    handleClose();
-  };
-
-  const handleSave = () => {
-    if (selected) {
-      const updatedPos: Position = {
-        ...selected,
-        superiorName: editSuperior,
-        directReportNames: editReports,
-      };
-      setAllPositions((prev) => prev.map((p) => (p.id === selected.id ? updatedPos : p)));
-      setSelected(updatedPos);
+    setSavingSuperior(true);
+    try {
+      await editarPosicion(`POS-${selected.id.padStart(5, "0")}`, {
+        posicionSuperiorId: newParentId,
+      });
+      await reload();
+      toastSuccess("Posición superior actualizada");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "No se pudo actualizar el superior.";
+      toastError(msg);
+    } finally {
+      setSavingSuperior(false);
     }
-    const now = new Date();
-    const h = now.getHours().toString().padStart(2, "0");
-    const m = now.getMinutes().toString().padStart(2, "0");
-    setLastSaved(`Hoy a las ${h}:${m}`);
-    toast.success("Cambios guardados con éxito", {
-      duration: 3500,
-      style: {
-        background: "#0F1819",
-        color: "#fff",
-        fontSize: "13px",
-        fontWeight: "600",
-        borderRadius: "12px",
-        border: "1px solid #203D47",
-      },
-      iconTheme: { primary: "#34d399", secondary: "#0F1819" },
-    });
-  };
+  }, [selected, editSuperiorId, reload]);
 
-  // ── Add Hierarchy ──────────────────────────────────────────────
+  // ── Agregar posición hija ──────────────────────────────────────────────
   const handleAddChild = useCallback((parent: Position) => {
     setAddParent(parent);
   }, []);
 
-  const handleAddConfirm = (newName: string) => {
+  const handleAddConfirm = async (newName: string) => {
     if (!addParent) return;
 
+    const idAdministrator = authUser?.adminId ?? authUser?.employeeId ?? null;
+    if (!idAdministrator) {
+      setErrorInfo({
+        message: "Tu sesión no tiene administrador asociado para crear posiciones.",
+        returnTo: "add",
+        ctx: addParent,
+      });
+      setAddParent(null);
+      return;
+    }
     if (!newName) {
       setErrorInfo({
-        message:
-          "El nombre de la posición no puede estar vacío. Por favor ingresa un nombre válido para la nueva posición.",
+        message: "El nombre de la posición no puede estar vacío.",
         returnTo: "add",
         ctx: addParent,
       });
@@ -178,11 +202,11 @@ export default function PositionHierarchyPage() {
       return;
     }
 
-    if (
-      allPositions.some((p) => p.name.toLowerCase() === newName.toLowerCase())
-    ) {
+    // El backend requiere `id_area`. Heredamos el área del padre.
+    const areaPadre = areas.find((a) => a.nombre === addParent.department);
+    if (!areaPadre) {
       setErrorInfo({
-        message: `No se puede aplicar la jerarquía establecida, ya que existe una posición llamada "${newName}". Por favor edita la configuración para crear una relación coherente.`,
+        message: "No se pudo determinar el área del padre. Crea esta posición desde Gestión de Áreas → Posiciones.",
         returnTo: "add",
         ctx: addParent,
       });
@@ -190,37 +214,38 @@ export default function PositionHierarchyPage() {
       return;
     }
 
-    const newPos: Position = {
-      id: `pos_${Date.now()}`,
-      name: newName,
-      department: addParent.department,
-      level: addParent.level + 1,
-      parentId: addParent.id,
-      superiorName: addParent.name,
-      employeeCount: 0,
-      status: "Active",
-      directReportNames: [],
-      iconType: "person",
-    };
-
-    const updated = [...allPositions, newPos];
-    setAllPositions(updated);
-    setTree(buildPositionTree(updated));
-    setAddParent(null);
-    toastSuccess();
+    try {
+      await crearPosicion(
+        {
+          nombre: newName,
+          description: `${newName} (creada desde el organigrama)`,
+          areaIdNumber: Number(areaPadre.id),
+          posicionSuperiorId: Number(addParent.id),
+          estado: "Active",
+          vacancies: 1,
+        },
+        idAdministrator,
+      );
+      setAddParent(null);
+      await reload();
+      toastSuccess("Posición creada");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "No se pudo crear la posición.";
+      setErrorInfo({ message: msg, returnTo: "add", ctx: addParent });
+      setAddParent(null);
+    }
   };
 
-  // ── Edit Hierarchy ─────────────────────────────────────────────
+  // ── Editar nombre de posición ──────────────────────────────────────────
   const handleEdit = useCallback((pos: Position) => {
     setEditPos(pos);
   }, []);
 
-  const handleEditConfirm = (newName: string) => {
+  const handleEditConfirm = async (newName: string) => {
     if (!editPos) return;
-
     if (!newName) {
       setErrorInfo({
-        message: "El nombre de la posición no puede estar vacío. Por favor ingresa un nombre válido.",
+        message: "El nombre de la posición no puede estar vacío.",
         returnTo: "edit",
         ctx: editPos,
       });
@@ -228,33 +253,21 @@ export default function PositionHierarchyPage() {
       return;
     }
 
-    const conflict = allPositions.find(
-      (p) => p.id !== editPos.id && p.name.toLowerCase() === newName.toLowerCase()
-    );
-    if (conflict) {
-      setErrorInfo({
-        message: `No se puede aplicar la jerarquía establecida, ya que la posición "${newName}" no puede ubicarse sobre sí misma, ni recibir reportes de sí misma. Por favor edita la configuración para crear una relación coherente.`,
-        returnTo: "edit",
-        ctx: editPos,
-      });
+    try {
+      await editarPosicion(`POS-${editPos.id.padStart(5, "0")}`, { nombre: newName });
       setEditPos(null);
-      return;
+      await reload();
+      toastSuccess("Posición actualizada");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "No se pudo actualizar la posición.";
+      setErrorInfo({ message: msg, returnTo: "edit", ctx: editPos });
+      setEditPos(null);
     }
-
-    const updated = allPositions.map((p) =>
-      p.id === editPos.id ? { ...p, name: newName } : p
-    );
-    setAllPositions(updated);
-    setTree(buildPositionTree(updated));
-    if (selected?.id === editPos.id) setSelected((prev) => prev ? { ...prev, name: newName } : null);
-    setEditPos(null);
-    toast.success("Posición actualizada", {
-      style: { background: "#0F1819", color: "#fff", borderRadius: "12px", border: "1px solid #203D47" },
-      iconTheme: { primary: "#34d399", secondary: "#0F1819" },
-    });
   };
 
-  // ── Detach ─────────────────────────────────────────────────────
+  // ── Desvincular del padre ──────────────────────────────────────────────
+  // En el backend: PUT /administrative-data/positions/remove-father/:id
+  // (no elimina la posición, solo le quita el parent_position_id).
   const handleDetach = useCallback((pos: Position) => {
     setDetachPos(pos);
   }, []);
@@ -263,34 +276,22 @@ export default function PositionHierarchyPage() {
     if (selected) setDetachPos(selected);
   }, [selected]);
 
-  const handleDetachConfirm = () => {
+  const handleDetachConfirm = async () => {
     if (!detachPos) return;
-
-    const parentId = detachPos.parentId;
-    const parentName = allPositions.find((p) => p.id === parentId)?.name;
-
-    const updated = allPositions
-      .filter((p) => p.id !== detachPos.id)
-      .map((p) =>
-        p.parentId === detachPos.id
-          ? { ...p, parentId, superiorName: parentName }
-          : p
-      );
-
     try {
-      const newTree = buildPositionTree(updated);
-      setAllPositions(updated);
-      setTree(newTree);
+      await eliminarJerarquiaPadre(`POS-${detachPos.id.padStart(5, "0")}`);
       if (selected?.id === detachPos.id) handleClose();
-    } catch {
-      // Tree build failed (e.g. no root) — silently ignore
+      setDetachPos(null);
+      await reload();
+      toastSuccess("Relación jerárquica desvinculada");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "No se pudo desvincular la posición.";
+      setDetachPos(null);
+      toastError(msg);
     }
-
-    setDetachPos(null);
-    toastDetached();
   };
 
-  // ── Error modal retry ──────────────────────────────────────────
+  // ── Reintentar tras error ──────────────────────────────────────────────
   const handleTryAgain = () => {
     if (!errorInfo) return;
     if (errorInfo.returnTo === "add") setAddParent(errorInfo.ctx);
@@ -298,70 +299,81 @@ export default function PositionHierarchyPage() {
     setErrorInfo(null);
   };
 
-  // ── Subordinates helper ────────────────────────────────────────
+  // ── Hijos para los modales ─────────────────────────────────────────────
   const childrenNames = (parentId: string) =>
     allPositions.filter((p) => p.parentId === parentId).map((p) => p.name);
 
+  const labelArea =
+    areaFilter === ALL_AREAS_VALUE
+      ? "Todas las áreas"
+      : areas.find((a) => a.id === areaFilter)?.nombre ?? "Todas las áreas";
+
   return (
     <div className="flex flex-col h-full w-full bg-[#f4f7f8]">
-      {/* Breadcrumb */}
       <header className="flex items-center px-6 py-3.5 bg-white border-b border-[#d1dde2] shrink-0">
         <nav className="flex items-center gap-1.5 text-xs text-[#8aa3ad]">
           <span className="hover:text-[#203D47] cursor-pointer transition-colors">Panel</span>
           <ChevronRight size={12} className="text-[#c5d5db]" />
           <span className="hover:text-[#203D47] cursor-pointer transition-colors">Estructura Organizacional</span>
           <ChevronRight size={12} className="text-[#c5d5db]" />
-          <span className="hover:text-[#203D47] cursor-pointer transition-colors">Posiciones</span>
-          <ChevronRight size={12} className="text-[#c5d5db]" />
           <span className="text-[#0F1819] font-semibold">Jerarquía</span>
         </nav>
       </header>
 
-      {/* Contenido */}
       <main className="flex-1 px-6 py-5 flex flex-col gap-4 overflow-hidden">
         <div>
           <h1 className="text-xl font-bold text-[#0F1819]">Jerarquía de Posiciones</h1>
           <p className="text-sm text-[#8aa3ad] mt-0.5">
-            Define y administra las relaciones de reporte y la estructura organizacional entre tus departamentos.
+            Vista en tiempo real de las relaciones de reporte entre posiciones. Los cambios se sincronizan con la sección de Posiciones.
           </p>
         </div>
 
-        {/* Filtros */}
         <div className="flex items-center gap-3">
           <div className="relative">
             <button
               onClick={() => setShowDeptDropdown((v) => !v)}
               className="flex items-center gap-2 bg-white border border-[#d1dde2] rounded-xl px-4 py-2.5 text-sm text-[#0F1819] font-medium hover:border-[#b0c4cc] transition-colors"
             >
-              <span>{department}</span>
+              <span>{labelArea}</span>
               <ChevronDown size={14} className="text-[#8aa3ad]" />
             </button>
             {showDeptDropdown && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowDeptDropdown(false)} />
-                <div className="absolute left-0 top-full mt-1.5 z-20 bg-white border border-[#d1dde2] rounded-xl shadow-lg overflow-hidden min-w-full">
-                  {DEPARTMENTS.map((d) => (
+                <div className="absolute left-0 top-full mt-1.5 z-20 bg-white border border-[#d1dde2] rounded-xl shadow-lg overflow-hidden min-w-[220px] max-h-72 overflow-y-auto">
+                  <button
+                    onClick={() => { setAreaFilter(ALL_AREAS_VALUE); setShowDeptDropdown(false); }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                      areaFilter === ALL_AREAS_VALUE ? "bg-emerald-50 text-emerald-700 font-semibold" : "text-[#0F1819] hover:bg-[#f4f7f8]"
+                    }`}
+                  >
+                    Todas las áreas
+                  </button>
+                  {areas.map((a) => (
                     <button
-                      key={d}
-                      onClick={() => { setDepartment(d); setShowDeptDropdown(false); }}
+                      key={a.id}
+                      onClick={() => { setAreaFilter(a.id); setShowDeptDropdown(false); }}
                       className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                        d === department ? "bg-emerald-50 text-emerald-700 font-semibold" : "text-[#0F1819] hover:bg-[#f4f7f8]"
+                        a.id === areaFilter ? "bg-emerald-50 text-emerald-700 font-semibold" : "text-[#0F1819] hover:bg-[#f4f7f8]"
                       }`}
                     >
-                      {d}
+                      {a.nombre}
                     </button>
                   ))}
                 </div>
               </>
             )}
           </div>
-          <button className="flex items-center gap-2 border border-[#d1dde2] bg-white text-[#4a7880] text-sm font-medium px-4 py-2.5 rounded-xl hover:border-[#b0c4cc] hover:bg-[#f4f7f8] transition-colors">
+          <button
+            disabled
+            title="Próximamente"
+            className="flex items-center gap-2 border border-[#d1dde2] bg-white text-[#4a7880] text-sm font-medium px-4 py-2.5 rounded-xl opacity-50 cursor-not-allowed"
+          >
             <Filter size={14} />
             Filtros Avanzados
           </button>
         </div>
 
-        {/* Card árbol + panel */}
         <div className="flex-1 bg-white rounded-2xl border border-[#d1dde2] shadow-sm overflow-hidden flex min-h-0">
           {loading && (
             <div className="flex-1 flex items-center justify-center">
@@ -376,10 +388,10 @@ export default function PositionHierarchyPage() {
               <div className="bg-rose-50 border border-rose-200 rounded-xl px-6 py-4 text-sm text-rose-500">{error}</div>
             </div>
           )}
-          {!loading && !error && tree && (
+          {!loading && !error && (
             <>
               <OrgTree
-                tree={tree}
+                trees={forest as PositionTree[]}
                 selectedId={selected?.id ?? null}
                 onSelect={handleSelect}
                 onAddChild={handleAddChild}
@@ -393,10 +405,12 @@ export default function PositionHierarchyPage() {
               <PositionDetailPanel
                 position={selected}
                 allPositions={allPositions}
-                superior={editSuperior}
+                superiorId={editSuperiorId}
                 reports={editReports}
-                onSuperiorChange={setEditSuperior}
+                onSuperiorIdChange={setEditSuperiorId}
                 onReportsChange={setEditReports}
+                onSaveSuperior={handleSaveSuperior}
+                superiorSaving={savingSuperior}
                 onClose={handleClose}
                 onDetach={handleDetachFromPanel}
               />
@@ -405,34 +419,6 @@ export default function PositionHierarchyPage() {
         </div>
       </main>
 
-      {/* Barra inferior — visible solo con panel abierto */}
-      <footer
-        className={`flex items-center justify-between px-6 bg-white border-t border-[#d1dde2] shrink-0 transition-all duration-200 ease-out overflow-hidden ${
-          selected ? "py-3.5 opacity-100 pointer-events-auto max-h-20" : "py-0 opacity-0 pointer-events-none max-h-0"
-        }`}
-      >
-        <div className="flex items-center gap-2 text-xs text-[#8aa3ad]">
-          <Clock size={13} />
-          <span>Último guardado: {lastSaved}</span>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={handleDiscard}
-            className="px-5 py-2.5 border border-[#d1dde2] text-[#4a7880] text-sm font-semibold rounded-xl hover:border-[#b0c4cc] hover:bg-[#f4f7f8] transition-colors"
-          >
-            Descartar Cambios
-          </button>
-          <button
-            onClick={handleSave}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
-          >
-            <Save size={14} />
-            Guardar Cambios
-          </button>
-        </div>
-      </footer>
-
-      {/* ── Modales ── */}
       {addParent && (
         <HierarchyModal
           mode="add"

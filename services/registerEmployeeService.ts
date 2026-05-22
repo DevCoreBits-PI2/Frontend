@@ -36,7 +36,10 @@ export async function obtenerAreasParaRegistro(): Promise<{ id: string; nombre: 
 }
 
 export async function obtenerPosicionesParaRegistro(): Promise<Position[]> {
-  const { data } = await obtenerPosiciones({ pageSize: 100 });
+  // Solo posiciones activas pueden recibir empleados nuevos. Las inactivas
+  // (soft-deleted por el backend) se ocultan del selector para evitar
+  // asignar personas a una posición que ya no está en uso.
+  const { data } = await obtenerPosiciones({ pageSize: 100, status: "Active" });
   return data.map((p) => ({
     id: String(p.rawId),
     nombre: p.nombre,

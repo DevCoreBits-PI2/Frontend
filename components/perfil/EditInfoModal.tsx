@@ -1,60 +1,69 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Upload, X } from 'lucide-react';
 
-interface UserInfo {
+// Sólo se permiten editar los campos que el backend acepta en
+// PATCH /employees/updateUser/:supabaseUserId (UpdateProfileDto):
+//   - age:        integer 18-100
+//   - photo_url:  URL HTTP válida (la foto se sube a Supabase Storage y la
+//                 URL pública resultante se manda al backend)
+//
+// Nombre y correo se muestran como información de solo lectura.
+
+export interface EditInfoFormValues {
+  edad: number | null;
+  photoFile: File | null;
+  // True si el usuario pidió quitar su foto actual (no hay archivo nuevo).
+  removePhoto: boolean;
+}
+
+interface ReadOnlyInfo {
   fullName: string;
-  phoneNumber: string;
   emailAddress: string;
-  photo: File | null;
 }
 
 interface EditInfoModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: UserInfo) => Promise<void>;
-  initialData?: Partial<UserInfo>;
+  onSave: (data: EditInfoFormValues) => Promise<void>;
+  readOnly: ReadOnlyInfo;
+  initialValues: {
+    edad: number | null;
+    currentPhotoUrl: string;
+  };
 }
 
-const UploadIcon = () => (
-  <svg width="38" height="38" viewBox="0 0 38 38" fill="none" aria-hidden="true">
-    <path
-      d="M13 27s-5 0-5-5c0-4.5 3.5-6 5-6 0-4.5 3-8 6-8s6 3.5 6 8c1.5 0 5 1.5 5 6 0 4.5-5 5-5 5"
-      stroke="#8aa3ad"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path d="M23.5 27L19 22.5 14.5 27" stroke="#8aa3ad" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M19 22.5V33" stroke="#8aa3ad" strokeWidth="1.6" strokeLinecap="round" />
-  </svg>
-);
+const MAX_BYTES = 5 * 1024 * 1024;
 
 export default function EditInfoModal({
   isOpen,
   onClose,
   onSave,
-  initialData = {},
+  readOnly,
+  initialValues,
 }: EditInfoModalProps) {
-  const [fullName, setFullName] = useState(initialData.fullName ?? '');
-  const [phoneNumber, setPhoneNumber] = useState(initialData.phoneNumber ?? '');
-  const [emailAddress, setEmailAddress] = useState(initialData.emailAddress ?? '');
-  const [photo, setPhoto] = useState<File | null>(initialData.photo ?? null);
+  const [edad, setEdad] = useState<string>(
+    initialValues.edad != null ? String(initialValues.edad) : '',
+  );
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [removeExisting, setRemoveExisting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
-    setFullName(initialData.fullName ?? '');
-    setPhoneNumber(initialData.phoneNumber ?? '');
-    setEmailAddress(initialData.emailAddress ?? '');
-    setPhoto(initialData.photo ?? null);
+    setEdad(initialValues.edad != null ? String(initialValues.edad) : '');
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setRemoveExisting(false);
     setErrors({});
-  }, [isOpen, initialData.fullName, initialData.phoneNumber, initialData.emailAddress, initialData.photo]);
+  }, [isOpen, initialValues.edad, initialValues.currentPhotoUrl]);
 
+  // Limpia object URLs creadas para preview.
   useEffect(() => {
     return () => {
       if (photoPreview) URL.revokeObjectURL(photoPreview);
@@ -68,44 +77,63 @@ export default function EditInfoModal({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
-  const validate = () => {
-    const newErrors: Record<string, string> = {};
-    if (!fullName.trim()) newErrors.fullName = 'El nombre es requerido.';
-    if (!phoneNumber.trim()) newErrors.phoneNumber = 'El teléfono es requerido.';
-    else if (!/^\+?[\d\s\-().]{7,20}$/.test(phoneNumber)) newErrors.phoneNumber = 'Teléfono inválido.';
-    if (!emailAddress.trim()) newErrors.emailAddress = 'El correo es requerido.';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress)) newErrors.emailAddress = 'Correo inválido.';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleFile = useCallback((file: File) => {
-    if (!file.type.startsWith('image/')) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setErrors((p) => ({ ...p, photo: 'Máximo 5 MB.' }));
+    setErrors((p) => { const n = { ...p }; delete n.photo; return n; });
+    if (!file.type.startsWith('image/')) {
+      setErrors((p) => ({ ...p, photo: 'Solo se permiten imágenes.' }));
       return;
     }
-    setErrors((p) => { const n = { ...p }; delete n.photo; return n; });
+    if (file.size > MAX_BYTES) {
+      setErrors((p) => ({ ...p, photo: 'La imagen no puede pesar más de 5 MB.' }));
+      return;
+    }
     if (photoPreview) URL.revokeObjectURL(photoPreview);
-    setPhoto(file);
+    setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
+    setRemoveExisting(false);
   }, [photoPreview]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    const file = e.dataTransfer.files[0];
+    const file = e.dataTransfer.files?.[0];
     if (file) handleFile(file);
   }, [handleFile]);
 
+  const handleRemovePhoto = () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setRemoveExisting(true);
+  };
+
+  const validate = (): EditInfoFormValues | null => {
+    const next: Record<string, string> = {};
+
+    let parsedEdad: number | null = null;
+    if (edad.trim()) {
+      const n = Number(edad);
+      if (!Number.isInteger(n)) next.edad = 'La edad debe ser un número entero.';
+      else if (n < 18 || n > 100) next.edad = 'La edad debe estar entre 18 y 100.';
+      else parsedEdad = n;
+    }
+
+    setErrors((p) => ({ ...p, edad: next.edad ?? '' }));
+    if (next.edad) return null;
+
+    return { edad: parsedEdad, photoFile, removePhoto: removeExisting };
+  };
+
   const handleSubmit = async () => {
-    if (!validate()) return;
+    const values = validate();
+    if (!values) return;
     setIsLoading(true);
     try {
-      await onSave({ fullName, phoneNumber, emailAddress, photo });
+      await onSave(values);
       onClose();
-    } catch {
-      // error delegado al caller
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'No se pudo guardar.';
+      setErrors((p) => ({ ...p, form: message }));
     } finally {
       setIsLoading(false);
     }
@@ -118,6 +146,12 @@ export default function EditInfoModal({
      bg-emerald-50 placeholder:text-[#8aa3ad]
      focus:ring-2 focus:ring-[#2ECC71]/25 focus:border-[#2ECC71]
      ${hasError ? 'border-red-400 bg-red-50' : 'border-emerald-200'}`;
+
+  const readOnlyClass =
+    'w-full rounded-lg border border-[#e8eef0] bg-[#f4f7f8] px-4 py-2.5 text-sm text-[#5b6f78] cursor-not-allowed';
+
+  const previewSrc = photoPreview
+    ?? (removeExisting ? null : initialValues.currentPhotoUrl || null);
 
   return (
     <>
@@ -135,115 +169,136 @@ export default function EditInfoModal({
       >
         <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
 
-          {/* Banner de advertencia */}
           <div className="flex items-start gap-3 border-b border-amber-100 bg-amber-50 px-5 py-3.5">
             <div className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-amber-400">
               <span className="text-[10px] font-bold leading-none text-white">i</span>
             </div>
             <div>
-              <p id="modal-title" className="text-sm font-bold text-amber-800">Formulario de Edición</p>
-              <p className="text-xs text-amber-600">Solo puedes editar estos campos</p>
+              <p id="modal-title" className="text-sm font-bold text-amber-800">Editar perfil</p>
+              <p className="text-xs text-amber-600">Solo edad y foto son editables desde aquí.</p>
             </div>
           </div>
 
-          {/* Campos */}
           <div className="flex flex-col gap-4 p-5">
 
-            {/* Full Name */}
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-[#1E333A]">Nombre Completo</label>
+              <label className="text-sm font-medium text-[#1E333A]">Nombre completo</label>
               <input
                 type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Jonny Doe"
-                autoComplete="name"
-                className={inputClass(errors.fullName)}
+                value={readOnly.fullName}
+                readOnly
+                disabled
+                className={readOnlyClass}
               />
-              {errors.fullName && <span className="text-xs text-red-500">{errors.fullName}</span>}
+              <span className="text-[11px] text-[#8aa3ad]">Solo lo modifica un administrador.</span>
             </div>
 
-            {/* Phone Number */}
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-[#1E333A]">Teléfono</label>
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="+57 310 000 0000"
-                autoComplete="tel"
-                className={inputClass(errors.phoneNumber)}
-              />
-              {errors.phoneNumber && <span className="text-xs text-red-500">{errors.phoneNumber}</span>}
-            </div>
-
-            {/* Email Address */}
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-[#1E333A]">Correo Electrónico</label>
+              <label className="text-sm font-medium text-[#1E333A]">Correo electrónico</label>
               <input
                 type="email"
-                value={emailAddress}
-                onChange={(e) => setEmailAddress(e.target.value)}
-                placeholder="usuario@correo.com"
-                autoComplete="email"
-                className={inputClass(errors.emailAddress)}
+                value={readOnly.emailAddress}
+                readOnly
+                disabled
+                className={readOnlyClass}
               />
-              {errors.emailAddress && <span className="text-xs text-red-500">{errors.emailAddress}</span>}
+              <span className="text-[11px] text-[#8aa3ad]">Se gestiona desde la sección de cuenta.</span>
             </div>
 
-            {/* Upload Photo */}
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-[#1E333A]">Subir Foto</label>
-              <div
-                role="button"
-                tabIndex={0}
-                aria-label="Subir foto"
-                onClick={() => fileInputRef.current?.click()}
-                onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={handleDrop}
-                className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed py-7 transition-colors ${
-                  isDragging
-                    ? 'border-[#2ECC71] bg-emerald-50'
-                    : 'border-[#8aa3ad]/50 bg-[#f8fafb] hover:border-[#8aa3ad]'
-                }`}
-              >
-                {photoPreview ? (
+              <label htmlFor="edit-edad" className="text-sm font-medium text-[#1E333A]">Edad</label>
+              <input
+                id="edit-edad"
+                type="number"
+                inputMode="numeric"
+                min={18}
+                max={100}
+                value={edad}
+                onChange={(e) => setEdad(e.target.value)}
+                placeholder="Ej: 30"
+                className={inputClass(errors.edad)}
+              />
+              {errors.edad && <span className="text-xs text-red-500">{errors.edad}</span>}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-[#1E333A]">Foto de perfil</label>
+
+              {previewSrc ? (
+                <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
                   <img
-                    src={photoPreview}
+                    src={previewSrc}
                     alt="Vista previa"
-                    className="h-16 w-16 rounded-full object-cover border-2 border-[#2ECC71]"
+                    className="h-16 w-16 rounded-full object-cover border-2 border-emerald-200"
                   />
-                ) : (
-                  <UploadIcon />
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-                />
-              </div>
+                  <div className="flex flex-1 flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="self-start text-xs font-semibold text-emerald-600 hover:underline"
+                    >
+                      Cambiar foto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRemovePhoto}
+                      className="self-start text-xs text-rose-500 hover:underline flex items-center gap-1"
+                    >
+                      <X size={12} /> Quitar foto
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Subir foto"
+                  onClick={() => fileInputRef.current?.click()}
+                  onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={handleDrop}
+                  className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-7 transition-colors ${
+                    isDragging
+                      ? 'border-[#2ECC71] bg-emerald-50'
+                      : 'border-[#8aa3ad]/50 bg-[#f8fafb] hover:border-[#8aa3ad]'
+                  }`}
+                >
+                  <Upload size={28} className="text-[#8aa3ad]" />
+                  <p className="text-xs text-[#5b6f78]">
+                    Arrastra una imagen o <span className="font-semibold text-emerald-600">haz clic para subirla</span>
+                  </p>
+                  <p className="text-[10px] text-[#8aa3ad]">JPG, PNG o WEBP · hasta 5 MB</p>
+                </div>
+              )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+              />
               {errors.photo && <span className="text-xs text-red-500">{errors.photo}</span>}
             </div>
 
-            {/* Botón Continue */}
+            {errors.form && (
+              <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{errors.form}</p>
+            )}
+
             <button
               onClick={handleSubmit}
               disabled={isLoading}
               className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-400 disabled:opacity-60"
             >
-              {isLoading ? 'Guardando...' : 'Continuar →'}
+              {isLoading ? 'Guardando...' : 'Guardar cambios'}
             </button>
 
-            {/* Cancel Edit */}
             <button
               onClick={onClose}
               className="text-center text-sm text-[#8aa3ad] underline underline-offset-2 transition-colors hover:text-[#203D47]"
             >
-              Cancelar Edición
+              Cancelar
             </button>
           </div>
         </div>

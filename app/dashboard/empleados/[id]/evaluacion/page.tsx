@@ -374,24 +374,32 @@ export default function EvaluacionEmpleadoPage() {
             <button
               onClick={async () => {
                 if (!empleado) return;
-                // Construir payload de evaluación
+                // Construir payload de evaluación.
+                // IMPORTANTE: la fecha debe ir en ISO (YYYY-MM-DD). El backend
+                // valida con @IsDate(); `toLocaleDateString()` produce formatos
+                // dependientes del locale que pueden fallar la validación y
+                // dejar la evaluación huérfana (sin career_history).
                 const evalObj: Evaluation = {
                   id: `${Date.now()}`,
                   title: `Revisión ${period}`,
                   reviewer: "Usuario Actual",
-                  date: new Date().toLocaleDateString(),
+                  date: new Date().toISOString().slice(0, 10),
                   score: parseFloat(compositeScore),
                   isRecent: true,
                   competencies: competencies.map((c) => ({ name: c.label, score: parseFloat(c.score.toFixed(2)) })),
                   observations,
                 };
 
-                if (!authUser?.employeeId) {
-                  toast.error("No se identificó al evaluador (perfil sin id de empleado).");
+                // `id_director` en BD es un Int sin FK (puede ser id de admin o
+                // de empleado). Si el usuario logueado es admin, usamos adminId;
+                // si es empleado (HumanTalent), usamos employeeId.
+                const directorId = authUser?.adminId ?? authUser?.employeeId ?? null;
+                if (!directorId) {
+                  toast.error("No se identificó al evaluador (sesión sin id de admin ni de empleado).");
                   return;
                 }
                 try {
-                  await guardarEvaluacion(empId, evalObj, authUser.employeeId);
+                  await guardarEvaluacion(empId, evalObj, directorId);
                   toast.success("Evaluación guardada.");
                   router.push(`/dashboard/empleados/${empId}`);
                 } catch (err) {

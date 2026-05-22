@@ -1,4 +1,9 @@
 // Servicio de organigrama — integrado con el endpoint público /positions-tree.
+//
+// El backend devuelve una lista plana de posiciones; cada nodo puede traer
+// children embebidos (cuando construyó el árbol) o no traerlos (cuando vino
+// como findMany plano). Aquí lo normalizamos a un árbol y lo aplanamos a
+// `Position[]` que es lo que la UI espera.
 
 import { Position, PositionTree } from "@/types/orgChart";
 import { obtenerArbolPosiciones } from "./positionsService";
@@ -22,6 +27,13 @@ function pickIcon(name: string): Position["iconType"] {
   return "person";
 }
 
+function employeeCountOf(node: PositionTreeNode): number {
+  if (typeof node._count?.employees === "number") return node._count.employees;
+  if (Array.isArray(node.employees)) return node.employees.length;
+  if (node.employee) return 1;
+  return 0;
+}
+
 function flattenTree(
   nodes: PositionTreeNode[] | undefined,
   out: Position[] = [],
@@ -33,7 +45,6 @@ function flattenTree(
     const childNodes = node.children ?? [];
     const id = node.id ?? node.id_position ?? 0;
     const area = node.area ?? node.areas;
-    const employeeCount = node._count?.employees ?? node.employees?.length ?? (node.employee ? 1 : 0);
     out.push({
       id: String(id),
       name: node.name,
@@ -41,7 +52,7 @@ function flattenTree(
       level,
       parentId: node.parent_position_id != null ? String(node.parent_position_id) : null,
       superiorName: parentName,
-      employeeCount,
+      employeeCount: employeeCountOf(node),
       status: node.status === "active" ? "Active" : "Inactive",
       directReportNames: childNodes.map((c) => c.name),
       iconType: pickIcon(node.name),
@@ -76,27 +87,33 @@ let cachedPositions: Position[] = [];
 export const getPositions = async (): Promise<Position[]> => {
   const tree = await obtenerArbolPosiciones();
   const normalizedTree = tree.some((node) => node.children?.length) ? tree : buildFlatTree(tree);
-  cachedPositions = flattenTree(normalizedTree);
+  // El backend hace soft-delete (status=inactive). En el organigrama solo
+  // queremos posiciones activas: si está inactiva no debe aparecer en el árbol.
+  // Como `DeletePositionModal` impide desactivar nodos con hijos o con padre,
+  // las posiciones inactivas siempre son aisladas → filtrarlas no genera
+  // huérfanos.
+  cachedPositions = flattenTree(normalizedTree).filter((p) => p.status === "Active");
   return cachedPositions;
 };
 
-export const buildPositionTree = (positions: Position[]): PositionTree => {
+/**
+ * Construye un bosque (lista de árboles) a partir de un arreglo plano de
+ * posiciones. Cada posición sin padre conocido se convierte en una raíz.
+ */
+export const buildPositionForest = (positions: Position[]): PositionTree[] => {
   const map = new Map<string, PositionTree>();
   positions.forEach((p) => map.set(p.id, { ...p, children: [] }));
 
-  let root: PositionTree | null = null;
+  const roots: PositionTree[] = [];
   map.forEach((node) => {
-    if (node.parentId === null) {
-      // Si hay múltiples raíces, escogemos la primera que aparezca.
-      if (!root) root = node;
+    if (node.parentId === null || !map.has(node.parentId)) {
+      roots.push(node);
     } else {
-      const parent = map.get(node.parentId);
-      if (parent) parent.children.push(node);
+      map.get(node.parentId)!.children.push(node);
     }
   });
 
-  if (!root) throw new Error("No se encontró una raíz en la jerarquía de cargos");
-  return root;
+  return roots;
 };
 
 export const getAllPositionNames = (): string[] => cachedPositions.map((p) => p.name);

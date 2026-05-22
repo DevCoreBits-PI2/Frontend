@@ -4,19 +4,15 @@ import { useRef } from "react";
 import { ClipboardEdit, CloudUpload, FileText, X } from "lucide-react";
 
 interface AdditionalInformationCardProps {
-  salario: number | "";
   notas: string;
   documento: File | null;
-  onSalarioChange: (valor: number | "") => void;
   onNotasChange: (valor: string) => void;
   onDocumentoChange: (file: File | null) => void;
 }
 
 export default function AdditionalInformationCard({
-  salario,
   notas,
   documento,
-  onSalarioChange,
   onNotasChange,
   onDocumentoChange,
 }: AdditionalInformationCardProps) {
@@ -40,26 +36,6 @@ export default function AdditionalInformationCard({
         <ClipboardEdit size={16} className="text-emerald-500" />
         <h2 className="text-sm font-bold text-[#0F1819]">Información Adicional</h2>
       </header>
-
-      {/* Salario */}
-      <div className="flex flex-col gap-1.5 mb-5">
-        <label className="text-xs font-medium text-[#0F1819]">Salario Base (Anual)</label>
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#8aa3ad]">$</span>
-          <input
-            type="number"
-            value={salario === "" ? "" : salario}
-            onChange={(e) => {
-              const valor = e.target.value;
-              onSalarioChange(valor === "" ? "" : Number(valor));
-            }}
-            placeholder="0.00"
-            min={0}
-            step="0.01"
-            className="w-full pl-7 pr-3 py-2.5 text-sm border border-[#d1dde2] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 text-[#0F1819] placeholder:text-[#c5d5db] bg-white"
-          />
-        </div>
-      </div>
 
       {/* Notas */}
       <div className="flex flex-col gap-1.5 mb-5">

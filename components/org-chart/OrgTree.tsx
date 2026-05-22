@@ -8,7 +8,7 @@ import { ZoomIn, ZoomOut, Maximize2, Plus } from "lucide-react";
 const LINE = "#94a3b8";
 
 interface OrgTreeProps {
-  tree: PositionTree;
+  trees: PositionTree[];
   selectedId: string | null;
   onSelect: (pos: Position) => void;
   onAddChild?: (parent: Position) => void;
@@ -128,7 +128,7 @@ function NodeWithChildren({
 }
 
 export default function OrgTree({
-  tree,
+  trees,
   selectedId,
   onSelect,
   onAddChild,
@@ -214,15 +214,26 @@ export default function OrgTree({
               transition: dragging ? "none" : "transform 0.12s ease-out",
             }}
           >
-            <NodeWithChildren
-              node={tree}
-              selectedId={selectedId}
-              onSelect={onSelect}
-              onAddChild={onAddChild}
-              onEdit={onEdit}
-              onDetach={onDetach}
-              isRoot
-            />
+            {trees.length === 0 ? (
+              <div className="text-sm text-[#8aa3ad] py-12">
+                No hay posiciones para mostrar.
+              </div>
+            ) : (
+              <div className="flex items-start gap-12">
+                {trees.map((tree) => (
+                  <NodeWithChildren
+                    key={tree.id}
+                    node={tree}
+                    selectedId={selectedId}
+                    onSelect={onSelect}
+                    onAddChild={onAddChild}
+                    onEdit={onEdit}
+                    onDetach={onDetach}
+                    isRoot
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

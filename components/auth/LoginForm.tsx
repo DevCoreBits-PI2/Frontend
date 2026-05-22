@@ -6,6 +6,7 @@ import AccessLevelToggle from "./AccessLevelToggle";
 import InputField from "../InputField";
 import AuthButton from "./AuthButton";
 import { loginUser } from "@/services/login";
+import { createClient } from "@/utils/supabase/client";
 import { toast } from "react-hot-toast";
 
 export default function LoginForm() {
@@ -39,6 +40,25 @@ export default function LoginForm() {
       if (mustSetPassword) {
         toast("Debes configurar tu contraseña primero", { icon: "⚠️" });
         router.push("/signup");
+        return;
+      }
+
+      // Validar que el tipo de login seleccionado coincida con el rol real
+      // del usuario. El JWT marca isAdmin (o is_admin) cuando el usuario
+      // existe en la tabla `administrators`.
+      const meta = (user?.app_metadata ?? {}) as Record<string, unknown>;
+      const isAdmin = meta.isAdmin === true || meta.is_admin === true;
+      const seleccionoAdmin = role === "admin";
+
+      if (seleccionoAdmin && !isAdmin) {
+        await createClient().auth.signOut();
+        toast.error("Esta cuenta no es de administrador. Cambia a \"Funcionario\".");
+        return;
+      }
+
+      if (!seleccionoAdmin && isAdmin) {
+        await createClient().auth.signOut();
+        toast.error("Esta cuenta es de administrador. Cambia a \"Administrador\".");
         return;
       }
 

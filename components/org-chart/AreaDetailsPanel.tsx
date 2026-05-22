@@ -1,9 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import { Position } from "@/types/orgChart";
 import {
   User, Cloud, Code2, Crown, Shield,
-  ChevronDown, ArrowUpDown, X, Plus, Link2Off,
+  ChevronDown, X, Plus, Link2Off, Save,
 } from "lucide-react";
 
 const ICON_MAP = { crown: Crown, person: User, cloud: Cloud, code: Code2, shield: Shield };
@@ -15,35 +16,76 @@ const ICON_BG: Record<string, string> = {
   crown:  "bg-amber-100 text-amber-600",
 };
 
+const NO_SUPERIOR_VALUE = "";
+
 interface Props {
   position: Position | null;
   allPositions: Position[];
-  superior: string;
+  /** Id (string del numérico) del superior seleccionado en la UI, o "" para "sin superior". */
+  superiorId: string;
   reports: string[];
-  onSuperiorChange: (v: string) => void;
+  onSuperiorIdChange: (v: string) => void;
   onReportsChange: (v: string[]) => void;
+  onSaveSuperior: () => void;
+  superiorSaving?: boolean;
   onClose: () => void;
   onDetach?: () => void;
+}
+
+/** Devuelve el set de IDs de la posición y todos sus descendientes. */
+function collectSelfAndDescendants(rootId: string, all: Position[]): Set<string> {
+  const childrenByParent = new Map<string, Position[]>();
+  for (const p of all) {
+    if (p.parentId == null) continue;
+    const list = childrenByParent.get(p.parentId) ?? [];
+    list.push(p);
+    childrenByParent.set(p.parentId, list);
+  }
+  const out = new Set<string>([rootId]);
+  const stack = [rootId];
+  while (stack.length) {
+    const id = stack.pop()!;
+    for (const child of childrenByParent.get(id) ?? []) {
+      if (!out.has(child.id)) {
+        out.add(child.id);
+        stack.push(child.id);
+      }
+    }
+  }
+  return out;
 }
 
 export default function PositionDetailPanel({
   position,
   allPositions,
-  superior,
+  superiorId,
   reports,
-  onSuperiorChange,
+  onSuperiorIdChange,
   onReportsChange,
+  onSaveSuperior,
+  superiorSaving = false,
   onClose,
   onDetach,
 }: Props) {
+  const blockedIds = useMemo(
+    () => (position ? collectSelfAndDescendants(position.id, allPositions) : new Set<string>()),
+    [position, allPositions],
+  );
+
+  // Opciones válidas como nuevo superior: cualquier posición que no sea la
+  // propia ni un descendiente (evita ciclos). Incluye nodos raíz.
+  const superiorOptions = useMemo(
+    () => (position ? allPositions.filter((p) => !blockedIds.has(p.id)) : []),
+    [position, allPositions, blockedIds],
+  );
+
   if (!position) return null;
 
   const Icon = ICON_MAP[position.iconType] ?? User;
   const iconColors = ICON_BG[position.iconType] ?? ICON_BG.person;
 
-  const superiorOptions = allPositions.filter(
-    (p) => p.id !== position.id && p.level < position.level
-  );
+  const currentParentId = position.parentId ?? NO_SUPERIOR_VALUE;
+  const isDirty = superiorId !== currentParentId;
 
   const removeReport = (name: string) =>
     onReportsChange(reports.filter((r) => r !== name));
@@ -82,36 +124,37 @@ export default function PositionDetailPanel({
           <span className="text-[10px] font-bold tracking-widest uppercase text-[#8aa3ad] block mb-2">
             Posición Superior
           </span>
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <select
-                value={superior}
-                onChange={(e) => onSuperiorChange(e.target.value)}
-                className="w-full appearance-none bg-white border border-[#d1dde2] rounded-xl px-3 py-2.5 text-sm text-[#0F1819] font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer pr-8 transition-colors hover:border-[#b0c4cc]"
-              >
-                {superiorOptions.length > 0
-                  ? superiorOptions.map((p) => (
-                      <option key={p.id} value={p.name}>{p.name}</option>
-                    ))
-                  : <option value={superior}>{superior || "—"}</option>
-                }
-              </select>
-              <ChevronDown
-                size={14}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8aa3ad] pointer-events-none"
-              />
-            </div>
-            <button
-              title="Intercambiar posición"
-              className="p-2.5 border border-[#d1dde2] rounded-xl text-[#8aa3ad] hover:text-[#0F1819] hover:border-[#b0c4cc] transition-colors"
+          <div className="relative">
+            <select
+              value={superiorId}
+              onChange={(e) => onSuperiorIdChange(e.target.value)}
+              disabled={superiorSaving}
+              className="w-full appearance-none bg-white border border-[#d1dde2] rounded-xl px-3 py-2.5 text-sm text-[#0F1819] font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer pr-8 transition-colors hover:border-[#b0c4cc] disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <ArrowUpDown size={14} />
-            </button>
+              <option value={NO_SUPERIOR_VALUE}>(Sin superior — posición raíz)</option>
+              {superiorOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                  {p.department ? ` — ${p.department}` : ""}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={14}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8aa3ad] pointer-events-none"
+            />
           </div>
           <p className="text-[11px] text-[#8aa3ad] leading-relaxed mt-2">
-            Cambiar la posición superior moverá automáticamente todos los reportes directos de{" "}
-            <span className="text-[#4a7880] font-medium">{position.name}</span> bajo la nueva estructura.
+            Selecciona la nueva posición superior. No se listan ni la propia posición ni sus descendientes para evitar ciclos.
           </p>
+          <button
+            onClick={onSaveSuperior}
+            disabled={!isDirty || superiorSaving}
+            className="mt-3 w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save size={14} />
+            {superiorSaving ? "Guardando..." : "Guardar superior"}
+          </button>
         </div>
 
         {/* Direct Reports */}

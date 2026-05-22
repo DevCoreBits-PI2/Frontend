@@ -157,15 +157,25 @@ export const actualizarEmpleado = async (
 //   communication, technical_proficiency, leadership_influence, innovation, reliability
 // La UI maneja nombres con etiquetas; mapeamos en ambas direcciones.
 
+// Las claves se comparan en lowercase contra `competency.name` del UI. Se
+// listan todas las variantes (con/sin tilde, español/inglés, label corto/largo)
+// que efectivamente envía la página de evaluación; faltaba "competencia técnica"
+// y "liderazgo e influencia", lo que hacía que esos dos puntajes se guardaran
+// como 0 en el backend.
 const COMPETENCY_TO_FIELD: Record<string, keyof CreatePerformanceEvaluationPayload> = {
   comunicacion: "communication",
   comunicación: "communication",
   communication: "communication",
   tecnica: "technical_proficiency",
   técnica: "technical_proficiency",
+  "competencia tecnica": "technical_proficiency",
+  "competencia técnica": "technical_proficiency",
   technical: "technical_proficiency",
+  "technical proficiency": "technical_proficiency",
   liderazgo: "leadership_influence",
+  "liderazgo e influencia": "leadership_influence",
   leadership: "leadership_influence",
+  "leadership influence": "leadership_influence",
   innovacion: "innovation",
   innovación: "innovation",
   innovation: "innovation",

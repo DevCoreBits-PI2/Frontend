@@ -36,7 +36,7 @@ export interface Position {
   }[];
   posicionSuperior: string | null;
   posicionSuperiorId: number | null;
-  estado: "Active" | "Drafting";
+  estado: "Active" | "Inactive";
   areaId: string;                      // string ("area-1") para retrocompat
   areaIdNumber: number;
   areaNombre: string;
@@ -84,7 +84,7 @@ function dtoToPosition(dto: PositionDto): Position {
     empleados,
     posicionSuperior: parent?.name ?? null,
     posicionSuperiorId: parent?.id ?? parent?.id_position ?? dto.parent_position_id ?? null,
-    estado: dto.status === "active" ? "Active" : "Drafting",
+    estado: dto.status === "active" ? "Active" : "Inactive",
     areaId: `area-${dto.id_area}`,
     areaIdNumber: dto.id_area,
     areaNombre: area?.name ?? "",
@@ -103,7 +103,7 @@ export interface NuevaPosicionInput {
   areaId?: string; // fallback retrocompat ("area-1")
   idAdministrator?: number;
   posicionSuperiorId?: number | null;
-  estado?: "Active" | "Drafting";
+  estado?: "Active" | "Inactive";
   vacancies?: number;
   description?: string;
   baseSalary?: number;
@@ -127,7 +127,7 @@ function positionToCreatePayload(p: NuevaPosicionInput, fallbackAdmin: number): 
     id_administrator: p.idAdministrator ?? fallbackAdmin,
     id_area: areaIdFromInput(p),
     parent_position_id: p.posicionSuperiorId ?? undefined,
-    status: p.estado === "Drafting" ? "inactive" : "active",
+    status: p.estado === "Inactive" ? "inactive" : "active",
     vacancies: p.vacancies ?? 1,
   };
 }
@@ -149,7 +149,7 @@ function positionToUpdatePayload(p: Partial<Position>): UpdatePositionPayload {
 
 export interface GetPositionsFilter {
   searchText?: string;
-  status?: "Active" | "Drafting" | "all";
+  status?: "Active" | "Inactive" | "all";
   tab?: "All" | "Hierarchy" | "Archived";
   page?: number;
   pageSize?: number;
@@ -171,7 +171,7 @@ export const obtenerPosiciones = async (
   // Mapear tab → status del backend
   let backendStatus: "active" | "inactive" | undefined;
   if (tab === "Hierarchy" || status === "Active") backendStatus = "active";
-  else if (tab === "Archived" || status === "Drafting") backendStatus = "inactive";
+  else if (tab === "Archived" || status === "Inactive") backendStatus = "inactive";
 
   const query: PositionPaginationQuery = {
     page,

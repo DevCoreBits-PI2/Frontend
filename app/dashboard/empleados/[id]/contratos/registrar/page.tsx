@@ -23,8 +23,17 @@ import AdditionalInformationCard from "@/components/contratos/AdditionalInformat
 const VALIDACION_INICIAL: ResultadoValidacion = {
   rangoFechasValido: true,
   sinSolapamiento: true,
-  presupuestoAprobado: true,
 };
+
+function fechaIsoHoy(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function fechaIsoEnUnAnio(): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function PaginaRegistrarContrato() {
   const params = useParams<{ id: string }>();
@@ -38,9 +47,8 @@ export default function PaginaRegistrarContrato() {
 
   // Estado del formulario
   const [tipo, setTipo] = useState<TipoContrato>("FIJO");
-  const [fechaInicio, setFechaInicio] = useState("2024-06-01");
-  const [fechaFin, setFechaFin] = useState("2025-05-31");
-  const [salario, setSalario] = useState<number | "">(75000);
+  const [fechaInicio, setFechaInicio] = useState(fechaIsoHoy);
+  const [fechaFin, setFechaFin] = useState(fechaIsoEnUnAnio);
   const [notas, setNotas] = useState("");
   const [documento, setDocumento] = useState<File | null>(null);
 
@@ -64,21 +72,14 @@ export default function PaginaRegistrarContrato() {
   // Validacion en vivo cada vez que cambian los datos relevantes
   useEffect(() => {
     const fechaFinReal = tipo === "INDEFINIDO" ? null : fechaFin;
-    const salarioNumero = typeof salario === "number" ? salario : 0;
-
-    validarContrato(empleadoId, fechaInicio, fechaFinReal, salarioNumero).then(setValidacion);
-  }, [empleadoId, tipo, fechaInicio, fechaFin, salario]);
+    validarContrato(empleadoId, fechaInicio, fechaFinReal).then(setValidacion);
+  }, [empleadoId, tipo, fechaInicio, fechaFin]);
 
   const formularioValido = useMemo(() => {
     if (!fechaInicio) return false;
-    if (typeof salario !== "number" || salario <= 0) return false;
     if (tipo !== "INDEFINIDO" && !fechaFin) return false;
-    return (
-      validacion.rangoFechasValido &&
-      validacion.sinSolapamiento &&
-      validacion.presupuestoAprobado
-    );
-  }, [fechaInicio, fechaFin, salario, tipo, validacion]);
+    return validacion.rangoFechasValido && validacion.sinSolapamiento;
+  }, [fechaInicio, fechaFin, tipo, validacion]);
 
   const handleGuardar = async () => {
     if (!formularioValido || guardando) return;
@@ -98,7 +99,6 @@ export default function PaginaRegistrarContrato() {
         tipo,
         fechaInicio,
         fechaFin: tipo === "INDEFINIDO" ? null : fechaFin,
-        salarioBase: typeof salario === "number" ? salario : 0,
         notas,
         archivoPdf: documento,
       });
@@ -186,10 +186,8 @@ export default function PaginaRegistrarContrato() {
                   />
 
                   <AdditionalInformationCard
-                    salario={salario}
                     notas={notas}
                     documento={documento}
-                    onSalarioChange={setSalario}
                     onNotasChange={setNotas}
                     onDocumentoChange={setDocumento}
                   />

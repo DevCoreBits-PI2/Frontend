@@ -64,7 +64,8 @@ export default function RegisterWorkChangeModal({
   useEffect(() => {
     if (!isOpen) return;
     obtenerAreas().then(setAreas);
-    obtenerPosiciones({ pageSize: 100 }).then((res) => setPosiciones(res.data));
+    // Solo posiciones activas son destino válido para traslados / cambios.
+    obtenerPosiciones({ pageSize: 100, status: "Active" }).then((res) => setPosiciones(res.data));
   }, [isOpen]);
 
   useEffect(() => {

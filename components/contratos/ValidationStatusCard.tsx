@@ -15,18 +15,13 @@ export default function ValidationStatusCard({
   const items = [
     {
       titulo: "Rango de Fechas Válido",
-      descripcion: "Las fechas de inicio y fin cumplen la política del año fiscal de la empresa.",
+      descripcion: "La fecha de fin debe ser posterior a la de inicio (o no aplicar si es indefinido).",
       ok: resultado.rangoFechasValido,
     },
     {
       titulo: "Sin Contratos Solapados",
       descripcion: `${nombreEmpleado} no tiene otros contratos activos durante este período.`,
       ok: resultado.sinSolapamiento,
-    },
-    {
-      titulo: "Aprobación de Presupuesto",
-      descripcion: "El salario base propuesto está dentro del presupuesto Q3 del departamento.",
-      ok: resultado.presupuestoAprobado,
     },
   ];
 

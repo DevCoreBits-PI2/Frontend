@@ -22,7 +22,13 @@ import type {
   ContractType,
 } from "@/types/api/contract";
 
-export type TipoContrato = "FIJO" | "INDEFINIDO" | "SERVICIO" | "TIEMPO_PARCIAL";
+export type TipoContrato =
+  | "FIJO"
+  | "INDEFINIDO"
+  | "SERVICIO"
+  | "TIEMPO_PARCIAL"
+  | "APRENDIZAJE"
+  | "OBRA";
 export type EstadoContrato = "ACTIVO" | "RENOVADO" | "EXPIRADO" | "ANULADO";
 export type ValidezContrato = "ONGOING" | "COMPLETED" | "EXPIRED" | "VOIDED";
 
@@ -34,7 +40,6 @@ export interface Contrato {
   tipo: TipoContrato;
   fechaInicio: string;
   fechaFin: string | null;
-  salarioBase: number;
   notas: string;
   documentoNombre?: string;
   pdfUrl?: string | null;
@@ -48,6 +53,8 @@ const TIPO_TO_BACKEND: Record<TipoContrato, ContractType> = {
   INDEFINIDO: "indefinite_term_contract",
   SERVICIO: "service_provision_contract",
   TIEMPO_PARCIAL: "temporary_contract",
+  APRENDIZAJE: "apprenticeship_contract",
+  OBRA: "work_or_project_based_contract",
 };
 
 const BACKEND_TO_TIPO: Record<ContractType, TipoContrato> = {
@@ -55,8 +62,17 @@ const BACKEND_TO_TIPO: Record<ContractType, TipoContrato> = {
   indefinite_term_contract: "INDEFINIDO",
   service_provision_contract: "SERVICIO",
   temporary_contract: "TIEMPO_PARCIAL",
-  apprenticeship_contract: "TIEMPO_PARCIAL",
-  work_or_project_based_contract: "SERVICIO",
+  apprenticeship_contract: "APRENDIZAJE",
+  work_or_project_based_contract: "OBRA",
+};
+
+export const TIPO_CONTRATO_LABEL: Record<TipoContrato, string> = {
+  FIJO: "Término fijo",
+  INDEFINIDO: "Término indefinido",
+  SERVICIO: "Prestación de servicios",
+  TIEMPO_PARCIAL: "Temporal",
+  APRENDIZAJE: "Aprendizaje",
+  OBRA: "Obra o labor",
 };
 
 function deriveEstado(dto: ContractDto): { estado: EstadoContrato; validez: ValidezContrato } {
@@ -90,7 +106,6 @@ function dtoToContrato(dto: ContractDto): Contrato {
     tipo: BACKEND_TO_TIPO[dto.contract_type] ?? "FIJO",
     fechaInicio: dto.start_date?.slice(0, 10) ?? "",
     fechaFin: dto.end_date ? dto.end_date.slice(0, 10) : null,
-    salarioBase: 0,                // El backend actual no expone salario en el contrato.
     notas: dto.conditions ?? "",
     pdfUrl: dto.pdf_url ?? dto.pdf_document ?? null,
     estado,
@@ -105,7 +120,6 @@ export interface NuevoContratoDTO {
   tipo: TipoContrato;
   fechaInicio: string;
   fechaFin: string | null;
-  salarioBase: number;
   notas: string;
   archivoPdf: File;
 }
@@ -154,7 +168,6 @@ export const obtenerContratoPorId = async (id: string): Promise<Contrato | null>
 
 export interface ActualizarContratoDTO {
   fechaFin?: string | null;
-  salarioBase?: number;
   notas?: string;
   tipo?: TipoContrato;
 }
@@ -215,18 +228,17 @@ export const anularContrato = async (id: string): Promise<Contrato> => {
 };
 
 // Validación local (no hay endpoint dedicado); se evalúa contra los contratos
-// activos del empleado que devuelve el backend.
+// activos del empleado que devuelve el backend. El backend no maneja salario
+// en contratos, así que esa validación no aplica.
 export interface ResultadoValidacion {
   rangoFechasValido: boolean;
   sinSolapamiento: boolean;
-  presupuestoAprobado: boolean;
 }
 
 export const validarContrato = async (
   idEmpleado: string,
   fechaInicio: string,
   fechaFin: string | null,
-  salario: number,
   excludeContratoId?: string,
 ): Promise<ResultadoValidacion> => {
   const inicio = new Date(fechaInicio);
@@ -252,7 +264,5 @@ export const validarContrato = async (
     sinSolapamiento = true; // No se pudo verificar; el backend hará la validación final.
   }
 
-  const presupuestoAprobado = salario > 0 && salario <= 500000;
-
-  return { rangoFechasValido, sinSolapamiento, presupuestoAprobado };
+  return { rangoFechasValido, sinSolapamiento };
 };
