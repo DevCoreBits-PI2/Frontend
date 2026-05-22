@@ -15,7 +15,7 @@
 // pero los componentes existentes esperan la forma `Evaluation`; usamos el adapter.
 
 import { apiGet, apiPatch, apiPost } from "@/lib/api/client";
-import { EMPLOYEES } from "@/lib/api/endpoints";
+import { EMPLOYEES, AREAS, POSITIONS } from "@/lib/api/endpoints";
 import { CAREER_HISTORY, PERFORMANCE } from "@/lib/api/endpoints";
 import { normalizePaginated } from "@/types/api/common";
 import type {
@@ -111,14 +111,65 @@ export function dtoToEmpleado(dto: EmployeeDto): Empleado {
 // ───────────────────────── Empleados ─────────────────────────
 
 export const obtenerEmpleados = async (): Promise<Empleado[]> => {
-  const data = await apiGet<unknown>(EMPLOYEES.findAll);
+  // limit alto: el backend pagina con 10 por defecto y el directorio no maneja
+  // paginación; sin esto solo veríamos los primeros 10 empleados.
+  const data = await apiGet<unknown>(EMPLOYEES.findAll, {
+    query: { limit: 1000 },
+  });
   return normalizePaginated<EmployeeDto>(data).map(dtoToEmpleado);
 };
+
+// El backend `findOne` de empleados retorna `id_position: number` pero NO el
+// cargo expandido ni el área (el Prisma findUnique no hace include). Hacemos
+// dos lookups extra para que el perfil muestre el nombre del cargo y del área.
+// Si alguno de los lookups falla, degradamos a string vacío en vez de romper.
+async function enrichEmployeeWithPositionAndArea(dto: EmployeeDto): Promise<EmployeeDto> {
+  if (!dto.id_position) return dto;
+
+  try {
+    const positionRaw = await apiGet<{
+      id_position?: number;
+      name?: string;
+      id_area?: number;
+    }>(POSITIONS.findOne(dto.id_position));
+
+    let areaInfo: { id: number; name: string } | undefined;
+    if (positionRaw?.id_area) {
+      try {
+        const areaRaw = await apiGet<{
+          id_area?: number;
+          id?: number;
+          name?: string;
+        }>(AREAS.findOne(positionRaw.id_area));
+        const areaId = areaRaw?.id_area ?? areaRaw?.id;
+        if (areaId && areaRaw?.name) {
+          areaInfo = { id: areaId, name: areaRaw.name };
+        }
+      } catch {
+        /* área opcional; si falla, dejamos solo el cargo */
+      }
+    }
+
+    return {
+      ...dto,
+      position: {
+        id: positionRaw?.id_position,
+        id_position: positionRaw?.id_position,
+        name: positionRaw?.name ?? "",
+        id_area: positionRaw?.id_area,
+        area: areaInfo,
+      },
+    };
+  } catch {
+    return dto;
+  }
+}
 
 export const obtenerEmpleadoPorId = async (id: string): Promise<Empleado | null> => {
   try {
     const dto = await apiGet<EmployeeDto>(EMPLOYEES.findOne(id));
-    return dtoToEmpleado(dto);
+    const enriched = await enrichEmployeeWithPositionAndArea(dto);
+    return dtoToEmpleado(enriched);
   } catch {
     return null;
   }

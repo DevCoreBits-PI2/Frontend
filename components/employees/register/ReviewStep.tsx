@@ -46,6 +46,18 @@ const ReviewStep: React.FC<Props> = ({ data, employeeId }) => {
             <div className="text-sm text-[#203D47]">{data.phone || "—"}</div>
           </div>
 
+          {/* Edad */}
+          <div>
+            <div className="text-xs font-semibold text-[#8aa3ad] uppercase mb-1">Edad</div>
+            <div className="text-sm text-[#203D47]">{data.age ?? "—"}</div>
+          </div>
+
+          {/* Documento */}
+          <div>
+            <div className="text-xs font-semibold text-[#8aa3ad] uppercase mb-1">Documento</div>
+            <div className="text-sm text-[#203D47]">{data.documentNumber || "—"}</div>
+          </div>
+
           {/* Job Role */}
           <div>
             <div className="text-xs font-semibold text-[#8aa3ad] uppercase mb-1">Cargo</div>
@@ -57,24 +69,6 @@ const ReviewStep: React.FC<Props> = ({ data, employeeId }) => {
             <div className="text-xs font-semibold text-[#8aa3ad] uppercase mb-1">Departamento</div>
             <div className="text-sm text-[#203D47]">{data.areaName || "—"}</div>
           </div>
-
-          {/* Start Date */}
-          <div>
-            <div className="text-xs font-semibold text-[#8aa3ad] uppercase mb-1">Fecha de Inicio</div>
-            <div className="text-sm text-[#203D47]">{data.hireDate || "—"}</div>
-          </div>
-
-          {/* Office Location */}
-          <div>
-            <div className="text-xs font-semibold text-[#8aa3ad] uppercase mb-1">Sede</div>
-            <div className="text-sm text-[#203D47]">Sede Principal</div>
-          </div>
-
-          {/* Reports To */}
-          <div className="col-span-2">
-            <div className="text-xs font-semibold text-[#8aa3ad] uppercase mb-1">Reporta a</div>
-            <div className="text-sm text-[#203D47]">Gerente de Departamento</div>
-          </div>
         </div>
 
         {/* Ready for Onboarding Banner */}
@@ -84,7 +78,7 @@ const ReviewStep: React.FC<Props> = ({ data, employeeId }) => {
             <div>
               <div className="font-semibold text-sm text-[#203D47]">Listo para Incorporación</div>
               <div className="text-xs text-[#203D47] mt-1">
-                Por favor confirma los detalles anteriores. Una vez enviado, se enviará automáticamente un correo de bienvenida con las credenciales de acceso al correo del empleado.
+                Confirma los datos. Al enviar se invitará al empleado por correo. El contrato formal (tipo, fechas, salario, condiciones) se registra después desde el módulo de Contratos.
               </div>
             </div>
           </div>

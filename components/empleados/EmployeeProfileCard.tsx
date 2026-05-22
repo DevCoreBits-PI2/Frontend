@@ -132,6 +132,27 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
 
   const iniciales = `${(nombreLocal || empleado.nombre).charAt(0)}${(apellidosLocal || empleado.apellidos).charAt(0)}`.toUpperCase();
 
+  // El backend NO guarda fecha de ingreso en la tabla `employees`. La mejor
+  // aproximación es el `start_date` del contrato más antiguo del empleado; si
+  // todavía no tiene contratos, no mostramos nada (evita la fecha hardcodeada
+  // "Feb 2019" que estaba antes).
+  const fechaIngreso = useMemo(() => {
+    if (contratos.length === 0) return null;
+    const fechas = contratos
+      .map((c) => (c.fechaInicio ? new Date(c.fechaInicio).getTime() : NaN))
+      .filter((t) => !Number.isNaN(t));
+    if (fechas.length === 0) return null;
+    return new Date(Math.min(...fechas));
+  }, [contratos]);
+
+  const fechaIngresoFormateada = useMemo(() => {
+    if (!fechaIngreso) return null;
+    return fechaIngreso
+      .toLocaleDateString("es-CO", { month: "short", year: "numeric" })
+      .replace(/^(\w)/, (c) => c.toUpperCase())
+      .replace(/\./g, "");
+  }, [fechaIngreso]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -252,10 +273,12 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                   <span className="font-semibold text-[#203D47]">
                     {empleado.codigoEmpleado}
                   </span>
-                  <span className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    Ingresó Feb 2019
-                  </span>
+                  {fechaIngresoFormateada && (
+                    <span className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      Ingresó {fechaIngresoFormateada}
+                    </span>
+                  )}
                   <span className="flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
                     {empleado.ubicacion}

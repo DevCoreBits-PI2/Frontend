@@ -1,17 +1,20 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  CONTRACT_TYPES,
   obtenerAreasParaRegistro,
   obtenerPosicionesParaRegistro,
   type Position,
 } from "../../../services/registerEmployeeService";
 
 interface Props {
-  data: { areaId?: string; positionId?: string; hireDate?: string; contractType?: string };
+  data: { areaId?: string; positionId?: string };
   onChange: (patch: Record<string, string>) => void;
 }
 
+// Solo asignación organizacional: área (filtro) + cargo. El tipo de contrato
+// y la fecha de inicio NO van acá — son del módulo de contratos (entidad
+// independiente en el backend, ver `contracts` table). Pedirlos en el registro
+// duplicaba datos y nunca se enviaban al backend.
 const WorkDetailsStep: React.FC<Props> = ({ data, onChange }) => {
   const [areas, setAreas] = useState<{ id: string; nombre: string }[]>([]);
   const [allPositions, setAllPositions] = useState<Position[]>([]);
@@ -57,14 +60,14 @@ const WorkDetailsStep: React.FC<Props> = ({ data, onChange }) => {
 
       <div>
         <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-          Posición
+          Cargo
         </label>
         <select
           value={data.positionId || ""}
           onChange={(e) => onChange({ positionId: e.target.value })}
           className="w-full px-4 py-3 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71] text-gray-700"
         >
-          <option value="">Seleccionar Posición</option>
+          <option value="">Seleccionar Cargo</option>
           {positions.map((p) => (
             <option key={p.id} value={p.id}>
               {p.nombre}
@@ -73,34 +76,11 @@ const WorkDetailsStep: React.FC<Props> = ({ data, onChange }) => {
         </select>
       </div>
 
-      <div>
-        <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-          Fecha de Contratación
-        </label>
-        <input
-          type="date"
-          value={data.hireDate || ""}
-          onChange={(e) => onChange({ hireDate: e.target.value })}
-          className="w-full px-4 py-3 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71] text-gray-700"
-        />
-      </div>
-
-      <div>
-        <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-          Tipo de Contrato
-        </label>
-        <select
-          value={data.contractType || ""}
-          onChange={(e) => onChange({ contractType: e.target.value })}
-          className="w-full px-4 py-3 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71] text-gray-700"
-        >
-          <option value="">Seleccionar tipo</option>
-          {CONTRACT_TYPES.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-            </option>
-          ))}
-        </select>
+      <div className="col-span-2 rounded-lg bg-[#f4f7f8] border border-[#d1dde2] p-4 text-xs text-[#576975] leading-relaxed">
+        <p className="font-semibold text-[#203D47] mb-1">Sobre el contrato</p>
+        El tipo de contrato, fecha de inicio, duración y condiciones laborales se
+        gestionan después desde el módulo de <strong>Contratos</strong>, una vez
+        el empleado acepte la invitación y tengas el documento firmado.
       </div>
     </div>
   );

@@ -10,12 +10,16 @@ import {
   isDocumentDuplicated,
   obtenerAreasParaRegistro,
   obtenerPosicionesParaRegistro,
+  PG_INT32_MAX,
   type Position,
 } from "../../../../services/registerEmployeeService";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { useAuth } from "@/lib/auth/AuthContext";
 
+// Solo campos que el backend acepta en `InviteUserDto` + los que la UI necesita
+// para navegación (areaId es filtro local del select de cargos). `hireDate` y
+// `contractType` salieron del registro porque viven en el módulo de contratos.
 interface RegisterFormState {
   fullName?: string;
   documentType?: string;
@@ -26,8 +30,6 @@ interface RegisterFormState {
   age?: number;
   areaId?: string;
   positionId?: string;
-  hireDate?: string;
-  contractType?: string;
 }
 
 const Page = () => {
@@ -40,6 +42,9 @@ const Page = () => {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateMessage, setDuplicateMessage] = useState<string | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
+  // Errores por campo del step 1; el step los recibe como prop y los pinta
+  // debajo de cada input. Se vacían cada vez que el usuario edita un campo.
+  const [step1Errors, setStep1Errors] = useState<Record<string, string>>({});
 
   const [areas, setAreas] = useState<{ id: string; nombre: string }[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -53,7 +58,65 @@ const Page = () => {
       .catch(() => toast.error("No se pudo cargar el catálogo de áreas/cargos."));
   }, []);
 
-  const patch = (p: Partial<RegisterFormState>) => setData((d) => ({ ...d, ...p }));
+  const patch = (p: Partial<RegisterFormState>) => {
+    setData((d) => ({ ...d, ...p }));
+    // Limpiar el error de los campos que el usuario está editando.
+    if (Object.keys(step1Errors).length > 0) {
+      setStep1Errors((prev) => {
+        const next = { ...prev };
+        for (const key of Object.keys(p)) delete next[key];
+        return next;
+      });
+    }
+  };
+
+  // Validación inline del step 1. Devuelve un objeto { campo: mensaje } con los
+  // errores encontrados; vacío si todo está OK. Las reglas reflejan los límites
+  // reales del backend (employees.code es int32; @IsInt en age; etc.).
+  const validateStep1 = (): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!data.fullName?.trim()) {
+      errors.fullName = "El nombre completo es obligatorio.";
+    } else if (data.fullName.trim().split(/\s+/).length < 2) {
+      errors.fullName = "Ingresa nombre y apellido.";
+    }
+
+    if (!data.documentType) {
+      errors.documentType = "Selecciona el tipo de documento.";
+    }
+
+    const docRaw = (data.documentNumber ?? "").trim();
+    if (!docRaw) {
+      errors.documentNumber = "El número de documento es obligatorio.";
+    } else if (!/^\d+$/.test(docRaw)) {
+      errors.documentNumber = "El documento solo puede contener dígitos.";
+    } else {
+      const docNum = Number(docRaw);
+      if (!docNum) {
+        errors.documentNumber = "El documento debe ser mayor a 0.";
+      } else if (docNum > PG_INT32_MAX) {
+        errors.documentNumber = `El documento excede el máximo permitido por el sistema (${PG_INT32_MAX.toLocaleString("es-CO")}). Verifica los dígitos.`;
+      }
+    }
+
+    if (!data.email?.trim()) {
+      errors.email = "El correo es obligatorio.";
+    } else if (!EMAIL_RE.test(data.email.trim())) {
+      errors.email = "Formato de correo inválido.";
+    }
+
+    if (data.age == null || Number.isNaN(data.age)) {
+      errors.age = "La edad es obligatoria.";
+    } else if (!Number.isInteger(data.age)) {
+      errors.age = "La edad debe ser un número entero.";
+    } else if (data.age < 18 || data.age > 100) {
+      errors.age = "La edad debe estar entre 18 y 100 años.";
+    }
+
+    return errors;
+  };
 
   const positionName = useMemo(
     () => positions.find((x) => x.id === data.positionId)?.nombre,
@@ -67,6 +130,15 @@ const Page = () => {
 
   const next = async () => {
     if (step === 1) {
+      // Validación inline: si hay errores, los pintamos debajo de los inputs
+      // y no avanzamos. El usuario ve TODO mal antes de pegarle al backend.
+      const errors = validateStep1();
+      if (Object.keys(errors).length > 0) {
+        setStep1Errors(errors);
+        return;
+      }
+      setStep1Errors({});
+
       if (await isDocumentDuplicated(data.documentNumber)) {
         setDuplicateMessage(undefined);
         setShowDuplicateModal(true);
@@ -99,8 +171,6 @@ const Page = () => {
         photo: data.photo,
         areaId: data.areaId,
         positionId: data.positionId,
-        hireDate: data.hireDate,
-        contractType: data.contractType,
         age: data.age,
         idAdministrator,
       });
@@ -160,7 +230,7 @@ const Page = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
-          {step === 1 && <PersonalDataStep data={data} onChange={patch} />}
+          {step === 1 && <PersonalDataStep data={data} onChange={patch} errors={step1Errors} />}
           {step === 2 && <WorkDetailsStep data={data} onChange={patch} />}
           {step === 3 && (
             <ReviewStep data={{ ...data, positionName, areaName }} employeeId={employeeId} />

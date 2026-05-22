@@ -87,15 +87,20 @@ export default function PaginaRegistrarContrato() {
       toast.error("Debes adjuntar el PDF del contrato.");
       return;
     }
-    if (!authUser?.employeeId) {
-      toast.error("Tu sesión no tiene empleado asociado para registrar contratos.");
+    // `id_manager` en `contracts` es Int sin FK ([schema.prisma]). El backend
+    // acepta tanto un id_employee como un adminId. Si el empleado ya tiene un
+    // manager asignado, lo usamos; si no, cae al id del usuario logueado
+    // (admin o HT empleado). Sólo bloqueamos si la sesión no resuelve ninguno.
+    const sessionActorId = authUser?.adminId ?? authUser?.employeeId ?? null;
+    if (!empleado?.managerId && !sessionActorId) {
+      toast.error("No se pudo identificar el manager del contrato (sesión sin id de admin ni de empleado).");
       return;
     }
     setGuardando(true);
     try {
       await crearContrato({
         idEmpleado: empleadoId,
-        idManager: empleado?.managerId ?? authUser.employeeId,
+        idManager: empleado?.managerId ?? sessionActorId!,
         tipo,
         fechaInicio,
         fechaFin: tipo === "INDEFINIDO" ? null : fechaFin,

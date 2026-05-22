@@ -5,9 +5,22 @@ import { DOCUMENT_TYPES } from "../../../services/registerEmployeeService";
 interface Props {
   data: any;
   onChange: (patch: any) => void;
+  /** Errores por campo (provistos por el wizard tras validar al avanzar). */
+  errors?: Record<string, string>;
 }
 
-const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
+// Helpers de estilo consistentes entre campos: borde rojo si hay error.
+const baseInput =
+  "w-full px-4 py-3 border-2 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71] text-gray-700";
+const inputClass = (hasError?: boolean) =>
+  `${baseInput} ${hasError ? "border-red-400 bg-red-50" : "border-gray-300"}`;
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="mt-1 text-xs font-medium text-red-600">{message}</p>;
+}
+
+const PersonalDataStep: React.FC<Props> = ({ data, onChange, errors = {} }) => {
   const [photoPreview, setPhotoPreview] = useState<string | undefined>(data.photo);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const docsInputRef = useRef<HTMLInputElement | null>(null);
@@ -49,9 +62,10 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
             type="text"
             value={data.fullName || ""}
             onChange={(e) => onChange({ fullName: e.target.value })}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71] text-gray-700"
+            className={inputClass(!!errors.fullName)}
             placeholder="Jonathan Doe"
           />
+          <FieldError message={errors.fullName} />
         </div>
 
         {/* Document Type & Number */}
@@ -63,7 +77,7 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
             <select
               value={data.documentType || ""}
               onChange={(e) => onChange({ documentType: e.target.value })}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71]  text-gray-700"
+              className={inputClass(!!errors.documentType)}
             >
               <option value="">Seleccionar tipo</option>
               {DOCUMENT_TYPES.map((d: any) => (
@@ -72,6 +86,7 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
                 </option>
               ))}
             </select>
+            <FieldError message={errors.documentType} />
           </div>
           <div>
             <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
@@ -79,11 +94,13 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
             </label>
             <input
               type="text"
+              inputMode="numeric"
               value={data.documentNumber || ""}
               onChange={(e) => onChange({ documentNumber: e.target.value })}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71]  text-gray-700"
+              className={inputClass(!!errors.documentNumber)}
               placeholder="12345678"
             />
+            <FieldError message={errors.documentNumber} />
           </div>
         </div>
 
@@ -97,9 +114,10 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
               type="email"
               value={data.email || ""}
               onChange={(e) => onChange({ email: e.target.value })}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71]  text-gray-700"
+              className={inputClass(!!errors.email)}
               placeholder="john.doe@example.com"
             />
+            <FieldError message={errors.email} />
           </div>
           <div>
             <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
@@ -109,10 +127,32 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange }) => {
               type="tel"
               value={data.phone || ""}
               onChange={(e) => onChange({ phone: e.target.value })}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71]  text-gray-700"
+              className={inputClass(!!errors.phone)}
               placeholder="+573200000000"
             />
+            <FieldError message={errors.phone} />
           </div>
+        </div>
+
+        {/* Edad — requerida por el backend (@IsInt). El form no la pedía y se */}
+        {/* guardaba como 0 por defecto. */}
+        <div>
+          <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
+            Edad
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={120}
+            value={data.age ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              onChange({ age: v === "" ? undefined : Number(v) });
+            }}
+            className={inputClass(!!errors.age)}
+            placeholder="30"
+          />
+          <FieldError message={errors.age} />
         </div>
 
         {/* Documents */}

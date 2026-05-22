@@ -77,8 +77,19 @@ export default function ChangePasswordModal({ isOpen, onClose, onSave }: ChangeP
     try {
       await onSave({ currentPassword, newPassword, confirmPassword });
       onClose();
-    } catch {
-      // handled by caller if needed
+    } catch (err) {
+      // Pintar el error del backend/Supabase en el campo correcto. El servicio
+      // arroja "La contraseña actual no es correcta." cuando signInWithPassword
+      // falla; el resto va a un error general al pie.
+      const msg = err instanceof Error ? err.message : "No se pudo actualizar la contraseña.";
+      const lower = msg.toLowerCase();
+      if (lower.includes("actual") || lower.includes("invalid") || lower.includes("credentials")) {
+        setErrors((prev) => ({ ...prev, currentPassword: "La contraseña actual es incorrecta." }));
+      } else if (lower.includes("igual a la actual") || lower.includes("misma")) {
+        setErrors((prev) => ({ ...prev, newPassword: msg }));
+      } else {
+        setErrors((prev) => ({ ...prev, form: msg }));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -205,6 +216,12 @@ export default function ChangePasswordModal({ isOpen, onClose, onSave }: ChangeP
               </div>
               {errors.confirmPassword && <span className="text-xs text-red-500">{errors.confirmPassword}</span>}
             </div>
+
+            {errors.form && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+                {errors.form}
+              </div>
+            )}
 
             <div className="mt-1 flex items-center justify-end gap-3 pt-2">
               <button

@@ -107,6 +107,8 @@ export default function UserProfileCard({
   });
 
   const handleSavePassword = async (data: { currentPassword: string; newPassword: string; confirmPassword: string }) => {
+    // No envolvemos en try/catch: si `cambiarPasswordUsuario` lanza, el modal
+    // lo captura y muestra el mensaje en el campo correspondiente.
     await cambiarPasswordUsuario({
       currentPassword: data.currentPassword,
       newPassword: data.newPassword,

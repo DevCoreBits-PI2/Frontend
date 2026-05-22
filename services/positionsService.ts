@@ -14,7 +14,7 @@
 // parentPositionId) para conservar el id del backend cuando se necesita actualizar.
 
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api/client";
-import { POSITIONS } from "@/lib/api/endpoints";
+import { EMPLOYEES, POSITIONS } from "@/lib/api/endpoints";
 import { normalizePaginated } from "@/types/api/common";
 import type {
   CreatePositionPayload,
@@ -23,6 +23,7 @@ import type {
   PositionTreeNode,
   UpdatePositionPayload,
 } from "@/types/api/position";
+import type { EmployeeDto } from "@/types/api/employee";
 
 export interface Position {
   id: string;                          // string-id derivado del numérico ("POS-00012")
@@ -197,13 +198,64 @@ export const obtenerPosiciones = async (
     if (meta?.total) total = meta.total;
   }
 
+  // `findAllPositions` del backend NO incluye los empleados de cada cargo
+  // (`getPositionsTree` sí). Para que la tabla de posiciones muestre el conteo
+  // y los avatares correctos, hacemos un fetch adicional de todos los empleados
+  // y agrupamos por id_position. Si el endpoint falla (p.ej. 403 por permisos),
+  // degradamos a la lista sin empleados.
+  await enrichPositionsWithEmployees(items);
+
   return { data: items, total, page, pageSize };
 };
+
+async function enrichPositionsWithEmployees(items: Position[]): Promise<void> {
+  if (items.length === 0) return;
+  try {
+    // El backend pagina con limit=10 por defecto. Pedimos límite alto para
+    // que los cargos cuenten todos sus empleados (no solo los primeros 10).
+    const raw = await apiGet<unknown>(EMPLOYEES.findAll, {
+      query: { limit: 1000 },
+    });
+    const employees = normalizePaginated<EmployeeDto>(raw);
+    const byPosition = new Map<number, Position["empleados"]>();
+
+    for (const emp of employees) {
+      const positionId = emp.id_position;
+      if (!positionId) continue;
+      const empId = emp.id ?? emp.id_employee ?? 0;
+      const nombre = `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() || `Empleado ${empId}`;
+      const entry = {
+        id: String(empId),
+        nombre,
+        foto: emp.photo_url ?? undefined,
+        iniciales: iniciales(nombre),
+      };
+      const list = byPosition.get(positionId) ?? [];
+      list.push(entry);
+      byPosition.set(positionId, list);
+    }
+
+    for (const position of items) {
+      const enriched = byPosition.get(position.rawId);
+      if (enriched && enriched.length > 0) {
+        position.empleados = enriched;
+      }
+    }
+  } catch {
+    // 403 esperable si el rol no es HumanTalent / Admin. Mantenemos la lista
+    // base sin empleados (igual que antes del enrich).
+  }
+}
 
 export const obtenerPosicionPorId = async (id: number | string): Promise<Position> => {
   const realId = typeof id === "string" && id.startsWith("POS-") ? Number(id.slice(4)) : id;
   const dto = await apiGet<PositionDto>(POSITIONS.findOne(realId));
-  return dtoToPosition(dto);
+  const position = dtoToPosition(dto);
+  // Mismo enriquecimiento que `obtenerPosiciones`: el backend `findOnePosition`
+  // tampoco hace include de employees, así que la vista de detalle quedaba con
+  // empleados vacíos. Hacemos el lookup adicional acá también.
+  await enrichPositionsWithEmployees([position]);
+  return position;
 };
 
 export const obtenerArbolPosiciones = async (): Promise<PositionTreeNode[]> => {

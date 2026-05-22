@@ -55,10 +55,10 @@ export interface RegisterPayload {
   phone: string;
   photo?: string;
   files?: { name: string; size: number; type: string }[];
+  // Solo asignación organizacional. Tipo/fecha/condiciones del contrato viven
+  // en otra entidad (`contracts`) y se manejan desde su propio módulo.
   areaId?: string;
   positionId?: string;
-  hireDate?: string;
-  contractType?: string;
   // Campos adicionales que el backend exige:
   age?: number;
   idAdministrator?: number;
@@ -82,7 +82,11 @@ export const isDocumentDuplicated = async (documentNumber?: string): Promise<boo
   const documento = Number(documentNumber.replace(/\D/g, ""));
   if (!documento) return false;
   try {
-    const data = await apiGet<unknown>(EMPLOYEES.findAll);
+    // limit alto: el backend pagina con 10 por defecto, lo que permitiría
+    // falsos negativos si el duplicado está fuera de la primera página.
+    const data = await apiGet<unknown>(EMPLOYEES.findAll, {
+      query: { limit: 1000 },
+    });
     return normalizePaginated<EmployeeDto>(data).some((e) => e.code === documento);
   } catch {
     return false; // si no se puede verificar, dejar que el backend valide.
@@ -98,6 +102,13 @@ function partirNombre(fullName: string): { first_name: string; last_name: string
     last_name: partes[partes.length - 1],
   };
 }
+
+// PostgreSQL `integer` (que es lo que usa la columna employees.code) es int32:
+// rango máximo 2_147_483_647 (≈ 2.14 mil millones, ~10 dígitos). Documentos
+// más largos disparan P2020 "ValueOutOfRange" en el backend → 500.
+// Esto cubre cédulas colombianas válidas hasta ~21 mil millones, pero números
+// más grandes (o IDs extranjeros largos) hay que bloquearlos acá.
+export const PG_INT32_MAX = 2_147_483_647;
 
 export const enviarRegistroEmpleado = async (
   payload: RegisterPayload,
@@ -121,6 +132,21 @@ export const enviarRegistroEmpleado = async (
 
   const { first_name, last_name } = partirNombre(payload.fullName);
   const documento = Number(payload.documentNumber.replace(/\D/g, ""));
+
+  if (!documento) {
+    return {
+      success: false,
+      errorCode: "BACKEND_ERROR",
+      errorMessage: "El número de documento es obligatorio y debe contener dígitos.",
+    };
+  }
+  if (documento > PG_INT32_MAX) {
+    return {
+      success: false,
+      errorCode: "BACKEND_ERROR",
+      errorMessage: `El número de documento (${payload.documentNumber}) excede el máximo permitido por el sistema (${PG_INT32_MAX}). Verifica los dígitos.`,
+    };
+  }
 
   const body: InviteUserPayload = {
     email: payload.email,

@@ -46,7 +46,11 @@ async function tryFetch<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 
 export async function obtenerEstadisticas(): Promise<EstadisticaDashboard> {
   return tryFetch(async () => {
-    const raw = await apiGet<unknown>(EMPLOYEES.findAll);
+    // limit alto: el backend pagina con 10; sin esto las métricas del
+    // dashboard contarían solo los primeros 10 empleados.
+    const raw = await apiGet<unknown>(EMPLOYEES.findAll, {
+      query: { limit: 1000 },
+    });
     const empleados = normalizePaginated<EmployeeDto>(raw);
 
     const personalActivo = empleados.filter((e) => e.status === "active").length;
