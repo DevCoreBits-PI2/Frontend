@@ -8,6 +8,7 @@ import { EMPLOYEES } from "@/lib/api/endpoints";
 import type { EmployeeDto } from "@/types/api/employee";
 import type { AdminDto } from "@/types/api/admin";
 import { obtenerAdminActual } from "@/services/adminService";
+import { POSITIONS } from "@/lib/api/endpoints";
 import { PositionId, type AuthUserContext } from "./roles";
 import { setCurrentAuthUser } from "./authCache";
 import SessionLoadingScreen from "@/components/auth/SessionLoadingScreen";
@@ -34,6 +35,7 @@ function deriveAuthUser(
   session: Session | null,
   profile: EmployeeDto | null,
   adminProfile: AdminDto | null,
+  tieneSubordinados: boolean | null,
 ): AuthUserContext | null {
   if (!session?.user) return null;
   const meta = (session.user.app_metadata ?? {}) as Record<string, unknown>;
@@ -48,6 +50,9 @@ function deriveAuthUser(
   if (typeof rawPos === "number") position = rawPos as PositionId;
   else if (profile?.id_position) position = profile.id_position as PositionId;
 
+  const cargoId =
+    typeof profile?.id_position === "number" ? profile.id_position : null;
+
   return {
     supabaseUserId: session.user.id,
     employeeId: profile?.id ?? null,
@@ -57,7 +62,36 @@ function deriveAuthUser(
     adminId: adminProfile?.id ?? null,
     position,
     isAdmin,
+    cargoId,
+    tieneSubordinados,
   };
+}
+
+/**
+ * Resuelve si el cargo del empleado tiene al menos un cargo hijo con un
+ * empleado activo. Usa `positions-tree` (público) — el backend lo arma con
+ * un Map que pone solo empleados active. Si no hay cargoId o el árbol falla,
+ * devuelve `false` (asume no-jefe).
+ */
+async function detectarTieneSubordinados(cargoId: number): Promise<boolean> {
+  try {
+    type FlatNode = {
+      id_position: number;
+      parent_position_id: number | null;
+      employee?: { first_name?: string; last_name?: string } | null;
+    };
+    const raw = await apiGet<unknown>(POSITIONS.tree);
+    const flat: FlatNode[] = Array.isArray(raw)
+      ? (raw as FlatNode[])
+      : Array.isArray((raw as { data?: unknown })?.data)
+        ? ((raw as { data: FlatNode[] }).data)
+        : [];
+    return flat.some(
+      (n) => n.parent_position_id === cargoId && n.employee != null,
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -67,7 +101,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<EmployeeDto | null>(null);
   const [adminProfile, setAdminProfile] = useState<AdminDto | null>(null);
   const [ready, setReady] = useState(false);
+  // `null` mientras no se ha resuelto la jerarquía; `boolean` después.
+  const [tieneSubordinados, setTieneSubordinados] = useState<boolean | null>(null);
   const lastFetchedFor = useRef<string | null>(null);
+  const lastSubordinadosFor = useRef<number | null>(null);
 
   const loadProfile = useCallback(async (uid: string) => {
     try {
@@ -176,9 +213,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase, loadAuthData]);
 
   const authUser = useMemo(
-    () => deriveAuthUser(session, profile, adminProfile),
-    [session, profile, adminProfile],
+    () => deriveAuthUser(session, profile, adminProfile, tieneSubordinados),
+    [session, profile, adminProfile, tieneSubordinados],
   );
+
+  // Resuelve "tieneSubordinados" en cuanto sabemos el cargo del empleado.
+  // Solo aplica a empleados (los admins no están en `employees` y no ocupan
+  // un cargo en la jerarquía).
+  useEffect(() => {
+    const cargoId =
+      typeof profile?.id_position === "number" ? profile.id_position : null;
+    if (!cargoId) {
+      setTieneSubordinados(null);
+      lastSubordinadosFor.current = null;
+      return;
+    }
+    if (lastSubordinadosFor.current === cargoId) return;
+    lastSubordinadosFor.current = cargoId;
+    let cancelado = false;
+    detectarTieneSubordinados(cargoId).then((tiene) => {
+      if (!cancelado) setTieneSubordinados(tiene);
+    });
+    return () => { cancelado = true; };
+  }, [profile?.id_position]);
 
   // Espejo del authUser en el cache module-level para que los services puedan
   // chequear permisos sin pasar por React. Se setea DURANTE el render (no en

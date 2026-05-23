@@ -13,7 +13,7 @@ import {
 import { listarHistorialPorEmpleado } from "@/services/carreraHistorialService";
 import { obtenerContratosPorEmpleado, type Contrato } from "@/services/contratosService";
 import { listarEvaluacionesPorEmpleado } from "@/services/evaluacionService";
-import { saveAvatar, getStoredAvatarFor, clearLocalAvatar } from "@/services/storageService";
+import { saveAvatar } from "@/services/storageService";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { UserProfile } from "@/types/funcionario";
 import type { CareerHistoryDto, PerformanceEvaluationDto } from "@/types/api/career";
@@ -44,15 +44,12 @@ export default function PerfilUsuarioPage() {
     let cancelado = false;
 
     const cargar = async () => {
-      const uid = authUser?.supabaseUserId ?? null;
-
       // Si el usuario es admin (verificado vía GET /api/admin/:id), usamos
       // ese perfil directamente. Los admins no están en employees.
       if (authUser?.isAdmin && adminProfile) {
         const baseAdmin = adminDtoToUserProfile(adminProfile);
-        const foto = getStoredAvatarFor(uid, baseAdmin.foto);
         if (!cancelado) {
-          setUser({ ...baseAdmin, foto });
+          setUser(baseAdmin);
           setLoading(false);
         }
         return;
@@ -60,8 +57,7 @@ export default function PerfilUsuarioPage() {
 
       try {
         const perfil = await obtenerPerfilUsuario();
-        const foto = getStoredAvatarFor(uid, perfil.foto);
-        if (!cancelado) setUser({ ...perfil, foto });
+        if (!cancelado) setUser(perfil);
       } catch {
         if (!cancelado) setError("No se pudo cargar el perfil de usuario.");
       } finally {
@@ -148,34 +144,23 @@ export default function PerfilUsuarioPage() {
       );
     }
 
-    // Subir/guardar la foto si el usuario eligió una nueva. saveAvatar intenta
-    // Supabase Storage; si el bucket "avatars" no existe, guarda en
-    // localStorage como fallback (solo visible en este navegador).
-    let photoUrlForBackend: string | undefined;
+    // Subir foto si el usuario eligió una nueva. `saveAvatar` sube vía
+    // PATCH /employees/upload-profile-image (Cloudinary), y el backend ya
+    // persiste `photo_url` en el empleado autenticado. El backend NO permite
+    // borrar la foto (UpdateProfileDto valida @IsUrl), por eso el modal solo
+    // ofrece reemplazar.
     if (data.photoFile) {
-      const result = await saveAvatar(data.photoFile);
-      if (result.publicUrl) {
-        photoUrlForBackend = result.publicUrl;
-      }
-      // Si quedó solo en localStorage, no se manda al backend porque @IsUrl
-      // rechaza data:; el avatar local se aplicará en la UI al re-render.
-    } else if (data.removePhoto) {
-      // El backend no permite borrar la foto (rechaza strings vacíos); solo
-      // limpiamos la copia local.
-      if (authUser?.supabaseUserId) clearLocalAvatar(authUser.supabaseUserId);
+      await saveAvatar(data.photoFile);
     }
 
+    // PATCH /updateUser solo para edad. El backend lo aceptará aunque no
+    // venga photoUrl (es opcional en UpdateProfileDto).
     const perfilGuardado = await actualizarPerfilUsuario({
       idEmployee: user.idFuncionario,
-      photoUrl: photoUrlForBackend,
       edad: data.edad ?? undefined,
     });
 
-    // Si la foto se quedó en local, la sustituimos al renderizar.
-    const fotoFinal = authUser?.supabaseUserId
-      ? getStoredAvatarFor(authUser.supabaseUserId, perfilGuardado.foto)
-      : perfilGuardado.foto;
-    setUser({ ...perfilGuardado, foto: fotoFinal });
+    setUser(perfilGuardado);
     setIsModalOpen(false);
   };
 

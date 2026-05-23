@@ -47,6 +47,14 @@ export interface AuthUserContext {
   adminId: number | null;
   position: PositionId | null;
   isAdmin: boolean;
+  /** id_position del cargo del empleado (mismo valor que `position` mientras
+   *  el flujo no separe rol/cargo). Lo exponemos como campo dedicado para
+   *  pasarlo a helpers de jerarquía sin acoplarlos al concepto "rol". */
+  cargoId: number | null;
+  /** `true` si al menos un cargo hijo (en la jerarquía de positions) está
+   *  ocupado por un empleado activo. Se calcula on-mount consultando el
+   *  positions-tree público. `null` durante el bootstrap (aún no resuelto). */
+  tieneSubordinados: boolean | null;
 }
 
 export function isHumanTalent(position: PositionId | null | undefined): boolean {
@@ -117,3 +125,46 @@ export const canSeeDashboard = anyAuthenticated;
 
 /** Ver el organigrama (positions-tree). Backend: público. */
 export const canSeeOrgChart = anyAuthenticated;
+
+// ───────────── Rol jerárquico inferido del backend ─────────────
+//
+// El backend no expone un "rol funcional" tipo admin/jefe/empleado. Los
+// derivamos combinando tres señales:
+//   - `isAdmin` (flag aparte del registro `administrators`)
+//   - `position` (PositionId)
+//   - `tieneSubordinados` (calculado en AuthContext mirando si algún cargo
+//     hijo del cargoId del empleado está ocupado por alguien activo)
+//
+// Estas funciones NO consultan al backend; trabajan sobre el `authUser` que
+// ya viene resuelto.
+
+type AuthForRole = Pick<AuthUserContext, "isAdmin" | "position" | "tieneSubordinados">;
+
+/** ¿Es jefe estructural? Tiene subordinados pero NO es HT/Admin (los HT/Admin
+ *  caen en su propia categoría con más permisos). Usar para mostrar UI de
+ *  "ver mi equipo" sin habilitar gestión administrativa. */
+export function isJefe(user: AuthForRole | null | undefined): boolean {
+  if (!user) return false;
+  if (user.isAdmin) return false;
+  if (isHumanTalent(user.position)) return false;
+  return user.tieneSubordinados === true;
+}
+
+/** ¿Es empleado regular sin gente a cargo? Solo ve su perfil y trayectoria. */
+export function esEmpleadoRegular(user: AuthForRole | null | undefined): boolean {
+  if (!user) return false;
+  if (user.isAdmin) return false;
+  if (isHumanTalent(user.position)) return false;
+  // Si el flag aún no se resolvió (null) tratamos como regular hasta que
+  // llegue la respuesta; evita parpadeo mostrando opciones de jefe que luego
+  // desaparecen.
+  return user.tieneSubordinados !== true;
+}
+
+/** Solo Admin puede editar el organigrama (mover cargos, cambiar padres,
+ *  crear/eliminar). El backend acepta también HT, pero por pedido del
+ *  producto el organigrama queda como vista solo-lectura para todos menos
+ *  Admin. */
+export function canEditOrgChart(user: AuthForRole | null | undefined): boolean {
+  return !!user?.isAdmin;
+}

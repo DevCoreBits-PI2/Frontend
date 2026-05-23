@@ -47,6 +47,10 @@ export const EMPLOYEES = {
   updateEmployee: (id: number | string) => `/employees/updateEmployee/${id}`,
   firstTimeSetup: (id: number | string) => `/employees/firstTimeSetup/${id}`,
   completeFirstLogin: (id: number | string) => `/employees/completeFirstLogin/${id}`,
+  // PATCH multipart/form-data con campo `file`. El backend resuelve el
+  // empleado destino desde el JWT (employeeId) y sube a Cloudinary; persiste
+  // `photo_url` y `public_id` en el registro del empleado.
+  uploadProfileImage: "/employees/upload-profile-image",
 };
 
 export const ADMIN = {

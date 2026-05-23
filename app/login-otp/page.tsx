@@ -11,10 +11,10 @@ export default function LoginOtpPage() {
 
         <div>
           <h1 className="text-2xl font-bold mb-2">
-            Iniciá sesión con un código enviado a tu correo
+            Inicia sesión con un código enviado a tu correo
           </h1>
           <p className="text-sm text-white/70 mt-3 leading-relaxed">
-            ¿Olvidaste tu contraseña o preferís no usarla? Te enviamos un código
+            ¿Olvidaste tu contraseña o prefieres no usarla? Te enviamos un código
             de un solo uso de 6 dígitos a tu correo registrado. Más rápido y sin
             recordar contraseñas.
           </p>

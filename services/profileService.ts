@@ -43,13 +43,10 @@ export function empleadoDtoToUserProfile(dto: EmployeeDto): UserProfile {
     cargoId: dto.position?.id ?? dto.position?.id_position ?? dto.id_position,
     area: dto.position?.area?.name ?? dto.area?.name ?? "",
     email: dto.email ?? "",
-    phone: "",
     fechaIngreso: dto.created_at?.slice(0, 10) ?? "",
     ubicacion: "",
     foto: dto.photo_url ?? "",
     estado: statusBackendToUi(dto.status),
-    fechaNacimiento: "",
-    oficina: "",
     reportaA: managerNombre,
     edad: dto.age,
   };
@@ -66,13 +63,10 @@ export function adminDtoToUserProfile(dto: AdminDto): UserProfile {
     cargo: "Administrador",
     area: "Administración",
     email: dto.email ?? "",
-    phone: "",
     fechaIngreso: "",
     ubicacion: "",
     foto: "",
     estado: "ACTIVO",
-    fechaNacimiento: "",
-    oficina: "",
     reportaA: "",
   };
 }

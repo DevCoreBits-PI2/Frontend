@@ -45,7 +45,7 @@ export default function OtpLoginForm() {
     setSubmitting(true);
     try {
       await solicitarOtp(email.trim());
-      toast.success(`Código enviado a ${email}. Revisá tu bandeja de entrada.`);
+      toast.success(`Código enviado a ${email}. Revisa tu bandeja de entrada.`);
       setPaso("codigo");
       setCooldown(SECONDS_REENVIO);
     } catch (err) {
@@ -112,7 +112,7 @@ export default function OtpLoginForm() {
           </h2>
         </div>
         <p className="text-xs text-gray-500 -mt-2 leading-relaxed">
-          Ingresá tu correo y te enviaremos un código de 6 dígitos para entrar
+          Ingresa tu correo y te enviaremos un código de 6 dígitos para entrar
           sin contraseña.
         </p>
 
@@ -149,7 +149,7 @@ export default function OtpLoginForm() {
       </div>
       <p className="text-xs text-gray-500 -mt-2 leading-relaxed">
         Te enviamos un código a <strong className="text-gray-700">{email}</strong>.
-        Revisá la bandeja de entrada (y la carpeta de spam).
+        Revisa la bandeja de entrada (y la carpeta de spam).
       </p>
 
       <div>
@@ -165,7 +165,7 @@ export default function OtpLoginForm() {
           autoComplete="one-time-code"
           value={codigo}
           onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 10))}
-          placeholder="Ingresá los dígitos del código"
+          placeholder="Ingresa los dígitos del código"
           className="w-full px-4 py-3 border-2 border-gray-300 rounded text-center text-2xl font-mono tracking-[0.3em] bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-700"
           autoFocus
         />

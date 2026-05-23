@@ -196,8 +196,13 @@ export default function UserProfileCard({
     return () => { cancelado = true; };
   }, [isAdmin, user.cargoId, user.idFuncionario]);
 
-  // Renderizado local del QR: convertimos el token (JWT real del backend) en
-  // una data URL usando la librería `qrcode`. El token nunca sale del navegador.
+  // Renderizado local del QR: encodea la URL pública de validación
+  // `https://www.devcorebits.com/validation/qr/<token>`. Cuando alguien
+  // escanea el QR, llega a la ruta /validation/qr/[token] del frontend, que
+  // hace POST /employees/qr/scan automáticamente y muestra la info del
+  // empleado. El token va en la URL (no en el body del QR), así cualquier
+  // app de cámara puede abrirlo sin necesidad de pegar nada.
+  const VALIDATION_BASE_URL = "https://www.devcorebits.com/validation/qr";
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -208,7 +213,8 @@ export default function UserProfileCard({
       return;
     }
 
-    QRCode.toDataURL(qrToken, {
+    const validationUrl = `${VALIDATION_BASE_URL}/${encodeURIComponent(qrToken)}`;
+    QRCode.toDataURL(validationUrl, {
       width: 240,
       margin: 1,
       errorCorrectionLevel: "M",
@@ -307,37 +313,49 @@ export default function UserProfileCard({
         </div>
       </div>
 
-      <div className="border-b border-platinum-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="flex gap-8">
-            {[
-              { id: 'trayectoria', label: 'Trayectoria', icon: '◆' },
-              { id: 'contratos',   label: 'Contratos',   icon: '□' },
-              { id: 'desempeño',   label: 'Desempeño',   icon: '▽' },
-              // El tab "Equipo Directo" solo aparece para empleados con al
-              // menos un subordinado estructural (cargo hijo en la jerarquía).
-              ...(!isAdmin && subordinados.length > 0
-                ? [{ id: 'equipo', label: `Equipo Directo (${subordinados.length})`, icon: '◇' }]
-                : []),
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`flex items-center gap-2 border-b-2 px-1 py-4 text-sm font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-jet-black-800 text-jet-black-900'
-                    : 'border-transparent text-platinum-600 hover:text-jet-black-900'
-                }`}
-              >
-                <span className="text-xs">{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
+      {/* Los administradores no son empleados de la organización: no tienen
+          trayectoria, ni contratos, ni evaluaciones. En su perfil solo
+          mostramos la sección de Información Personal — los tabs se ocultan
+          por completo. */}
+      {!isAdmin && (
+        <div className="border-b border-platinum-200 bg-white">
+          <div className="mx-auto max-w-7xl px-6">
+            <div className="flex gap-8">
+              {[
+                { id: 'trayectoria', label: 'Trayectoria', icon: '◆' },
+                { id: 'contratos',   label: 'Contratos',   icon: '□' },
+                { id: 'desempeño',   label: 'Desempeño',   icon: '▽' },
+                // El tab "Equipo Directo" solo aparece para empleados con al
+                // menos un subordinado estructural (cargo hijo en la jerarquía).
+                ...(subordinados.length > 0
+                  ? [{ id: 'equipo', label: `Equipo Directo (${subordinados.length})`, icon: '◇' }]
+                  : []),
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                  className={`flex items-center gap-2 border-b-2 px-1 py-4 text-sm font-medium transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-jet-black-800 text-jet-black-900'
+                      : 'border-transparent text-platinum-600 hover:text-jet-black-900'
+                  }`}
+                >
+                  <span className="text-xs">{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="mx-auto max-w-7xl px-6 py-8">
+        {isAdmin ? (
+          // Admin: una sola columna con Información Personal centrada.
+          <div className="max-w-2xl">
+            <SidebarInformacionPersonal user={user} estadoLabel={estadoConfig.label} codigoVisible={codigoVisible} />
+          </div>
+        ) : (
         <div className="grid grid-cols-3 gap-6">
           <div className="col-span-2">
             {activeTab === 'trayectoria' && (
@@ -593,6 +611,7 @@ export default function UserProfileCard({
             )}
           </div>
         </div>
+        )}
       </div>
 
       <ChangePasswordModal
@@ -607,6 +626,61 @@ export default function UserProfileCard({
         title={passwordToast.title}
         message={passwordToast.message}
       />
+    </div>
+  );
+}
+
+/** Card de "Información Personal" usada en el perfil del administrador.
+ *  Para admins no mostramos cargo / departamento / reporta a, porque no
+ *  forman parte de la jerarquía. Para empleados existe la versión completa
+ *  inline en el render principal. */
+function SidebarInformacionPersonal({
+  user,
+  estadoLabel,
+  codigoVisible,
+}: {
+  user: UserProfile;
+  estadoLabel: string;
+  codigoVisible: number;
+}) {
+  return (
+    <div className="rounded-xl bg-white p-6 shadow-sm">
+      <div className="mb-6 flex items-center gap-2 border-b border-platinum-200 pb-4">
+        <span className="text-lg">📋</span>
+        <h3 className="font-bold text-jet-black-900">Información Personal</h3>
+      </div>
+      <div className="space-y-5 text-sm">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Nombre</p>
+            <p className="text-xs font-medium text-jet-black-800">{user.nombre} {user.apellidos}</p>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Correo</p>
+            <p className="break-words text-xs font-medium text-jet-black-800">{user.email || '—'}</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 pt-2">
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Código</p>
+            <p className="text-xs font-medium text-jet-black-800">EMP-{codigoVisible}</p>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Estado</p>
+            <p className="text-xs font-medium text-jet-black-800">{estadoLabel}</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 pt-2">
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Rol</p>
+            <p className="text-xs font-medium text-jet-black-800">Administrador</p>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-platinum-600">Edad</p>
+            <p className="text-xs font-medium text-jet-black-800">{user.edad ?? '—'}</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

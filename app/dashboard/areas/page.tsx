@@ -10,7 +10,6 @@ import ToastNotification from "@/components/ToastNotification";
 import ViewAreaModal from "@/components/areas/ViewAreaModal";
 import { ChevronRight, Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { canManageHumanTalent } from "@/lib/auth/roles";
 
 interface ToastInfo {
   title: string;
@@ -19,7 +18,10 @@ interface ToastInfo {
 
 export default function PaginaAreas() {
   const { authUser } = useAuth();
-  const puedeGestionar = authUser ? canManageHumanTalent(authUser) : false;
+  // Crear, editar y eliminar áreas: SOLO Admin (más estricto que el backend,
+  // que también acepta HT, pero por pedido del producto esto se reserva a
+  // administradores).
+  const puedeGestionar = !!authUser?.isAdmin;
   const [areas, setAreas] = useState<Area[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +109,7 @@ export default function PaginaAreas() {
               const area = areas.find((a) => a.id === id);
               if (area) setAreaAEliminar(area);
             }}
+            puedeGestionar={puedeGestionar}
           />
         )}
       </main>

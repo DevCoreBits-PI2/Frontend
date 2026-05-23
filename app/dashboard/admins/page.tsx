@@ -54,7 +54,7 @@ function AdministradoresContenido() {
 
   const handleBlock = async (id: number, accion: "bloquear" | "desbloquear") => {
     if (id === adminProfile?.id) {
-      toast.error("No podés bloquear tu propia cuenta de administrador.");
+      toast.error("No puedes bloquear tu propia cuenta de administrador.");
       return;
     }
     setAccionId(id);
@@ -140,7 +140,7 @@ function AdministradoresContenido() {
                               {a.name} {a.last_name}
                               {esYo && (
                                 <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">
-                                  Vos
+                                  Tú
                                 </span>
                               )}
                             </p>
@@ -159,7 +159,7 @@ function AdministradoresContenido() {
                           <button
                             disabled={esYo || accionId === a.id}
                             onClick={() => handleBlock(a.id, "bloquear")}
-                            title={esYo ? "No podés bloquearte a vos mismo" : "Bloquear administrador"}
+                            title={esYo ? "No puedes bloquearte a ti mismo" : "Bloquear administrador"}
                             className="rounded-lg p-2 text-amber-600 transition-colors hover:bg-amber-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
                           >
                             <Lock size={14} />
@@ -167,7 +167,7 @@ function AdministradoresContenido() {
                           <button
                             disabled={esYo || accionId === a.id}
                             onClick={() => handleBlock(a.id, "desbloquear")}
-                            title={esYo ? "No podés desbloquearte a vos mismo" : "Desbloquear administrador"}
+                            title={esYo ? "No puedes desbloquearte a ti mismo" : "Desbloquear administrador"}
                             className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
                           >
                             <Unlock size={14} />
@@ -182,7 +182,7 @@ function AdministradoresContenido() {
             {admins.length === 0 && (
               <div className="flex flex-col items-center gap-2 px-5 py-12 text-center text-sm text-[#8aa3ad]">
                 <Trash2 size={20} className="text-[#d1dde2]" />
-                <p>Aún no hay administradores. Creá el primero con el botón superior.</p>
+                <p>Aún no hay administradores. Crea el primero con el botón superior.</p>
               </div>
             )}
           </div>

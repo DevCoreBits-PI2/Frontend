@@ -108,7 +108,7 @@ export default function FirstLoginGate({ children }: { children: React.ReactNode
               Configurá tu contraseña
             </h2>
             <p className="text-xs text-[#576975]">
-              Es la primera vez que ingresás. Definí una contraseña para tu cuenta.
+              Es la primera vez que ingresas. Define una contraseña para tu cuenta.
             </p>
           </div>
         </div>
@@ -137,7 +137,7 @@ export default function FirstLoginGate({ children }: { children: React.ReactNode
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-[#0F1819]">Confirmá la contraseña</label>
+            <label className="text-sm font-medium text-[#0F1819]">Confirma la contraseña</label>
             <input
               type={show ? "text" : "password"}
               value={confirm}

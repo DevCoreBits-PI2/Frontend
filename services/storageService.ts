@@ -1,85 +1,69 @@
-// Persistencia de avatar.
+// Persistencia de avatar — backend (Cloudinary) como única fuente de verdad.
 //
-// Estrategia: intentamos Supabase Storage (bucket "avatars" público); si no
-// existe, hacemos fallback automático a localStorage como data URL, indexado
-// por supabase_user_id. Así el usuario ve su foto al menos en el navegador
-// donde la subió, sin tener que tocar configuración de Supabase.
+// Endpoint: PATCH /employees/upload-profile-image  (multipart/form-data, `file`)
+// El backend resuelve el empleado destino desde el JWT, sube a Cloudinary y
+// persiste `photo_url` y `public_id` en el registro del empleado. La nueva
+// URL se obtiene re-fetchando el perfil (`obtenerPerfilUsuario`).
 //
-// Lectura: `getStoredAvatar(userId, fallback)` devuelve la URL local primero
-// (más reciente) y si no hay nada, la del backend.
+// Antes este módulo guardaba copia local en localStorage cuando el backend
+// fallaba. Esa estrategia se quitó por pedido explícito: la foto vive solo
+// en backend, no en el navegador.
+//
+// Se mantienen `getStoredAvatarFor` y `clearLocalAvatar` como helpers compat
+// para no romper callers, pero ya no leen ni escriben localStorage para
+// uploads nuevos. `clearLocalAvatar` se sigue ofreciendo para purgar restos
+// de la implementación antigua.
 
-import { createClient } from "@/utils/supabase/client";
+import { ApiError, apiRequest } from "@/lib/api/client";
+import { EMPLOYEES } from "@/lib/api/endpoints";
 
-const AVATARS_BUCKET = "avatars";
 const LS_PREFIX = "avatar-data:";
-const LS_BUCKET_SKIP = "avatar-bucket-skip";
-
-function shouldSkipBucket(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(LS_BUCKET_SKIP) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function markBucketSkip(): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(LS_BUCKET_SKIP, "1");
-  } catch {
-    // ignorar
-  }
-}
-
-const MIME_TO_EXT: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/jpg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/gif": "gif",
-};
-
-function extensionFor(file: File): string {
-  const fromMime = MIME_TO_EXT[file.type];
-  if (fromMime) return fromMime;
-  const fromName = file.name.split(".").pop();
-  return fromName && fromName.length <= 5 ? fromName.toLowerCase() : "bin";
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") resolve(reader.result);
-      else reject(new Error("No se pudo leer la imagen."));
-    };
-    reader.onerror = () => reject(new Error("No se pudo leer la imagen."));
-    reader.readAsDataURL(file);
-  });
-}
 
 export interface SaveAvatarResult {
-  /** URL aceptable por el backend (https://) o `null` si no hay URL pública. */
+  /** URL pública (https://) devuelta por Cloudinary. Puede venir `null` si el
+   *  backend confirmó la subida pero no incluyó la URL en la respuesta
+   *  (caso actual de users-ms, que devuelve solo `{ id_employee }`). En ese
+   *  caso, el caller debe re-fetchear el perfil para obtener `photo_url`. */
   publicUrl: string | null;
-  /** True cuando la foto se guardó solo en localStorage, no en Storage. */
-  localOnly: boolean;
+  /** Siempre `false`. Se mantiene en la interfaz por compatibilidad. */
+  localOnly: false;
 }
 
-function getSupabase() {
-  return createClient();
+/** Shape posible de la respuesta del backend de upload. */
+interface UploadResponse {
+  id_employee?: number;
+  photo_url?: string;
+  photoUrl?: string;
+  secure_url?: string;
+  url?: string;
+  employee?: { photo_url?: string };
+  data?: { photo_url?: string; secure_url?: string };
 }
 
-async function getCurrentUserId(): Promise<string> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) throw new Error("No hay sesión activa.");
-  return data.user.id;
+function extractUrl(resp: UploadResponse | null | undefined): string | null {
+  if (!resp) return null;
+  return (
+    resp.photo_url ??
+    resp.photoUrl ??
+    resp.secure_url ??
+    resp.url ??
+    resp.employee?.photo_url ??
+    resp.data?.photo_url ??
+    resp.data?.secure_url ??
+    null
+  );
+}
+
+/** El backend confirma éxito devolviendo `{ id_employee }` aunque la URL no
+ *  viaje en la respuesta. */
+function isUploadSuccess(resp: UploadResponse | null | undefined): boolean {
+  if (!resp) return false;
+  return typeof resp.id_employee === "number" || !!extractUrl(resp);
 }
 
 /**
- * Guarda el archivo intentando Supabase Storage; si el bucket no existe o el
- * usuario no tiene permisos, hace fallback a localStorage.
+ * Sube la imagen al backend (Cloudinary). Si falla, lanza error — no hay
+ * fallback local. La foto vive en Cloudinary, no en el navegador.
  */
 export async function saveAvatar(file: File): Promise<SaveAvatarResult> {
   if (!file.type.startsWith("image/")) {
@@ -89,65 +73,63 @@ export async function saveAvatar(file: File): Promise<SaveAvatarResult> {
     throw new Error("La imagen no puede pesar más de 5 MB.");
   }
 
-  const userId = await getCurrentUserId();
+  const form = new FormData();
+  form.append("file", file);
 
-  // 1) Intentar Supabase Storage — solo si no marcamos antes que el bucket no
-  //    existe (así no llenamos la consola con 400s en cada intento).
-  if (!shouldSkipBucket()) {
-    try {
-      const supabase = getSupabase();
-      const path = `${userId}/${Date.now()}.${extensionFor(file)}`;
-      const { error: uploadError } = await supabase.storage
-        .from(AVATARS_BUCKET)
-        .upload(path, file, {
-          cacheControl: "3600",
-          upsert: true,
-          contentType: file.type,
-        });
-
-      if (!uploadError) {
-        const { data: publicData } = supabase.storage
-          .from(AVATARS_BUCKET)
-          .getPublicUrl(path);
-        if (publicData?.publicUrl) {
-          // Si la subida sirvió, limpiamos cualquier fallback local previo para
-          // evitar mostrar una foto vieja en lugar de la nueva del backend.
-          clearLocalAvatar(userId);
-          return { publicUrl: publicData.publicUrl, localOnly: false };
-        }
-      } else {
-        // 400/404 → el bucket no existe o no tenemos permisos. Marcamos para
-        // saltar intentos posteriores en esta sesión.
-        markBucketSkip();
-      }
-    } catch {
-      markBucketSkip();
+  try {
+    const resp = await apiRequest<UploadResponse>(EMPLOYEES.uploadProfileImage, {
+      method: "PATCH",
+      body: form,
+    });
+    if (!isUploadSuccess(resp)) {
+      throw new Error("El servidor no confirmó la subida de la imagen.");
     }
-  }
-
-  // 2) Fallback: data URL en localStorage
-  const dataUrl = await readFileAsDataUrl(file);
-  try {
-    localStorage.setItem(LS_PREFIX + userId, dataUrl);
+    // Si subió bien al backend, limpiamos cualquier shadow local que hubiera
+    // quedado de la implementación anterior. Así no muestra una foto vieja
+    // al render siguiente.
+    await purgeLocalShadow();
+    return { publicUrl: extractUrl(resp), localOnly: false };
   } catch (err) {
-    // El cuota de localStorage es ~5MB. Si la imagen es muy grande, falla aquí.
-    throw new Error(
-      "No se pudo guardar la foto en este dispositivo (la imagen es muy grande o el navegador bloqueó localStorage).",
-    );
+    if (err instanceof ApiError) {
+      throw new Error(err.message || "No se pudo subir la foto al servidor.");
+    }
+    throw err instanceof Error
+      ? err
+      : new Error("No se pudo subir la foto al servidor.");
   }
-  return { publicUrl: null, localOnly: true };
 }
 
-/** Devuelve la URL para mostrar el avatar: localStorage primero, si no, fallback. */
-export function getStoredAvatarFor(userId: string | null, fallback: string): string {
-  if (!userId || typeof window === "undefined") return fallback;
+async function tryGetSupabaseUserId(): Promise<string | null> {
   try {
-    return localStorage.getItem(LS_PREFIX + userId) ?? fallback;
+    const { createClient } = await import("@/utils/supabase/client");
+    const { data } = await createClient().auth.getUser();
+    return data.user?.id ?? null;
   } catch {
-    return fallback;
+    return null;
   }
 }
 
+async function purgeLocalShadow(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const userId = await tryGetSupabaseUserId();
+  if (!userId) return;
+  try {
+    localStorage.removeItem(LS_PREFIX + userId);
+  } catch {
+    // ignorar
+  }
+}
+
+/**
+ * Compat. La foto vive en backend, así que devolvemos siempre el `fallback`
+ * (que es la `photo_url` proveniente del perfil cargado). Se mantiene la
+ * firma para no romper callers existentes.
+ */
+export function getStoredAvatarFor(_userId: string | null, fallback: string): string {
+  return fallback;
+}
+
+/** Limpia cualquier copia local antigua (de la implementación vieja). */
 export function clearLocalAvatar(userId: string): void {
   if (typeof window === "undefined") return;
   try {

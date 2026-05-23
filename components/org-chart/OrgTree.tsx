@@ -57,13 +57,16 @@ function NodeWithChildren({
           {/* Vertical line down from node */}
           <div style={{ width: 1, height: 26, background: LINE }} />
 
-          {/* Add-child button — only for non-root nodes with children */}
-          {!isRoot && (
+          {/* Botón "Agregar posición hija" — solo se muestra cuando hay
+              handler (rol con permisos de edición) y el nodo no es root.
+              En modo solo-lectura, `onAddChild` viene `undefined` y el
+              botón directamente no aparece. */}
+          {!isRoot && onAddChild && (
             <>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onAddChild?.(node);
+                  onAddChild(node);
                 }}
                 title="Agregar posición hija"
                 className="w-6 h-6 rounded-full bg-emerald-500 hover:bg-emerald-400 flex items-center justify-center text-white transition-colors shadow-sm z-10"

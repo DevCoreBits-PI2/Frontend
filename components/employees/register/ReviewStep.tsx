@@ -40,16 +40,10 @@ const ReviewStep: React.FC<Props> = ({ data, employeeId }) => {
             <div className="text-sm text-[#203D47]">{data.email || "—"}</div>
           </div>
 
-          {/* Phone Number */}
-          <div>
-            <div className="text-xs font-semibold text-[#8aa3ad] uppercase mb-1">Teléfono</div>
-            <div className="text-sm text-[#203D47]">{data.phone || "—"}</div>
-          </div>
-
           {/* Edad */}
           <div>
             <div className="text-xs font-semibold text-[#8aa3ad] uppercase mb-1">Edad</div>
-            <div className="text-sm text-[#203D47]">{data.age ?? "—"}</div>
+            <div className="text-sm text-[#203D47]">{data.age != null ? `${data.age} años` : "—"}</div>
           </div>
 
           {/* Documento */}

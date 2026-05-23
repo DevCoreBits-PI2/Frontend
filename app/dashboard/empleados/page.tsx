@@ -5,11 +5,22 @@ import Link from "next/link";
 import { ChevronRight, Search, FileText, MapPin, ClipboardList } from "lucide-react";
 import { Empleado, obtenerEmpleados } from "@/services/empleadosService";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { canManageHumanTalent } from "@/lib/auth/roles";
+import { RouteGuard } from "@/lib/auth/RouteGuard";
 
 export default function PaginaDirectorioEmpleados() {
+  // Directorio: solo Admin. Cualquier otro rol que tipee la URL directa
+  // verá "Acceso restringido".
+  return (
+    <RouteGuard requireAdmin>
+      <DirectorioContenido />
+    </RouteGuard>
+  );
+}
+
+function DirectorioContenido() {
   const { authUser } = useAuth();
-  const puedeCrear = authUser ? canManageHumanTalent(authUser) : false;
+  // Si llegó hasta acá ya es Admin → puede crear empleados.
+  const puedeCrear = !!authUser?.isAdmin;
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -113,9 +124,18 @@ export default function PaginaDirectorioEmpleados() {
                     className="bg-white rounded-2xl border border-[#e8eef0] p-5 flex flex-col gap-4 hover:shadow-md transition-shadow"
                   >
                       <Link href={`/dashboard/empleados/${emp.id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#203D47] to-[#0F1819] flex items-center justify-center text-white text-sm font-semibold shrink-0">
-                          {iniciales}
-                        </div>
+                        {emp.foto ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={emp.foto}
+                            alt={`${emp.nombre} ${emp.apellidos}`}
+                            className="w-12 h-12 rounded-full object-cover shrink-0 border border-[#e8eef0]"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#203D47] to-[#0F1819] flex items-center justify-center text-white text-sm font-semibold shrink-0">
+                            {iniciales}
+                          </div>
+                        )}
                         <div className="flex flex-col overflow-hidden">
                           <h3 className="text-sm font-bold text-[#0F1819] truncate">
                             {emp.nombre} {emp.apellidos}
@@ -136,6 +156,15 @@ export default function PaginaDirectorioEmpleados() {
                     </div>
 
 
+                    {/* Si el empleado está invitado, todavía no aceptó la
+                        invitación → no tiene contratos ni puede ser evaluado.
+                        Mostramos un placeholder en lugar de los botones para
+                        evitar que un admin entre y vea pantallas vacías. */}
+                    {emp.estado === "INVITADO" ? (
+                      <div className="mt-auto rounded-lg border border-dashed border-sky-200 bg-sky-50/60 px-3.5 py-2.5 text-center text-[11px] font-medium text-sky-700">
+                        Esperando aceptación de la invitación.
+                      </div>
+                    ) : (
                     <div className="mt-auto flex gap-2">
                       <Link
                         href={`/dashboard/empleados/${emp.id}/contratos`}
@@ -152,6 +181,7 @@ export default function PaginaDirectorioEmpleados() {
                         Evaluar
                       </Link>
                     </div>
+                    )}
                   </article>
                 );
               })

@@ -1,21 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Upload, X } from 'lucide-react';
+import { Upload } from 'lucide-react';
 
-// Sólo se permiten editar los campos que el backend acepta en
-// PATCH /employees/updateUser/:supabaseUserId (UpdateProfileDto):
-//   - age:        integer 18-100
-//   - photo_url:  URL HTTP válida (la foto se sube a Supabase Storage y la
-//                 URL pública resultante se manda al backend)
+// Sólo se permiten editar los campos que el backend acepta:
+//   - age:        integer 18-100 (PATCH /employees/updateUser/:id)
+//   - photoFile:  archivo de imagen (PATCH /employees/upload-profile-image,
+//                 sube a Cloudinary y persiste photo_url en BD)
 //
-// Nombre y correo se muestran como información de solo lectura.
+// El backend NO permite "borrar" la foto: el DTO UpdateProfileDto valida
+// @IsUrl en photo_url, así que no se puede setear vacía o null. Por eso el
+// modal solo ofrece "Cambiar foto" (reemplazar), no "Quitar foto". Nombre
+// y correo se muestran como información de solo lectura.
 
 export interface EditInfoFormValues {
   edad: number | null;
   photoFile: File | null;
-  // True si el usuario pidió quitar su foto actual (no hay archivo nuevo).
-  removePhoto: boolean;
 }
 
 interface ReadOnlyInfo {
@@ -32,6 +32,11 @@ interface EditInfoModalProps {
     edad: number | null;
     currentPhotoUrl: string;
   };
+  /** Si es `false`, oculta la sección de subir/cambiar foto. Útil cuando un
+   *  admin edita a OTRO empleado: el backend solo permite al propio empleado
+   *  subir su foto (el endpoint `upload-profile-image` resuelve el id desde
+   *  el JWT del solicitante). Default: true (modo self-edit). */
+  allowPhotoUpload?: boolean;
 }
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -42,13 +47,13 @@ export default function EditInfoModal({
   onSave,
   readOnly,
   initialValues,
+  allowPhotoUpload = true,
 }: EditInfoModalProps) {
   const [edad, setEdad] = useState<string>(
     initialValues.edad != null ? String(initialValues.edad) : '',
   );
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [removeExisting, setRemoveExisting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +64,6 @@ export default function EditInfoModal({
     setEdad(initialValues.edad != null ? String(initialValues.edad) : '');
     setPhotoFile(null);
     setPhotoPreview(null);
-    setRemoveExisting(false);
     setErrors({});
   }, [isOpen, initialValues.edad, initialValues.currentPhotoUrl]);
 
@@ -90,7 +94,6 @@ export default function EditInfoModal({
     if (photoPreview) URL.revokeObjectURL(photoPreview);
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
-    setRemoveExisting(false);
   }, [photoPreview]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -99,13 +102,6 @@ export default function EditInfoModal({
     const file = e.dataTransfer.files?.[0];
     if (file) handleFile(file);
   }, [handleFile]);
-
-  const handleRemovePhoto = () => {
-    if (photoPreview) URL.revokeObjectURL(photoPreview);
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    setRemoveExisting(true);
-  };
 
   const validate = (): EditInfoFormValues | null => {
     const next: Record<string, string> = {};
@@ -121,7 +117,7 @@ export default function EditInfoModal({
     setErrors((p) => ({ ...p, edad: next.edad ?? '' }));
     if (next.edad) return null;
 
-    return { edad: parsedEdad, photoFile, removePhoto: removeExisting };
+    return { edad: parsedEdad, photoFile };
   };
 
   const handleSubmit = async () => {
@@ -150,8 +146,7 @@ export default function EditInfoModal({
   const readOnlyClass =
     'w-full rounded-lg border border-[#e8eef0] bg-[#f4f7f8] px-4 py-2.5 text-sm text-[#5b6f78] cursor-not-allowed';
 
-  const previewSrc = photoPreview
-    ?? (removeExisting ? null : initialValues.currentPhotoUrl || null);
+  const previewSrc = photoPreview ?? (initialValues.currentPhotoUrl || null);
 
   return (
     <>
@@ -221,66 +216,80 @@ export default function EditInfoModal({
               {errors.edad && <span className="text-xs text-red-500">{errors.edad}</span>}
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-[#1E333A]">Foto de perfil</label>
+            {allowPhotoUpload ? (
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-[#1E333A]">Foto de perfil</label>
 
-              {previewSrc ? (
-                <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
-                  <img
-                    src={previewSrc}
-                    alt="Vista previa"
-                    className="h-16 w-16 rounded-full object-cover border-2 border-emerald-200"
-                  />
-                  <div className="flex flex-1 flex-col gap-1">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="self-start text-xs font-semibold text-emerald-600 hover:underline"
-                    >
-                      Cambiar foto
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleRemovePhoto}
-                      className="self-start text-xs text-rose-500 hover:underline flex items-center gap-1"
-                    >
-                      <X size={12} /> Quitar foto
-                    </button>
+                {previewSrc ? (
+                  <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
+                    <img
+                      src={previewSrc}
+                      alt="Vista previa"
+                      className="h-16 w-16 rounded-full object-cover border-2 border-emerald-200"
+                    />
+                    <div className="flex flex-1 flex-col gap-1">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="self-start text-xs font-semibold text-emerald-600 hover:underline"
+                      >
+                        Cambiar foto
+                      </button>
+                      <span className="text-[11px] text-[#8aa3ad]">
+                        Sube una nueva imagen para reemplazar la actual.
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Subir foto"
+                    onClick={() => fileInputRef.current?.click()}
+                    onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={handleDrop}
+                    className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-7 transition-colors ${
+                      isDragging
+                        ? 'border-[#2ECC71] bg-emerald-50'
+                        : 'border-[#8aa3ad]/50 bg-[#f8fafb] hover:border-[#8aa3ad]'
+                    }`}
+                  >
+                    <Upload size={28} className="text-[#8aa3ad]" />
+                    <p className="text-xs text-[#5b6f78]">
+                      Arrastra una imagen o <span className="font-semibold text-emerald-600">haz clic para subirla</span>
+                    </p>
+                    <p className="text-[10px] text-[#8aa3ad]">JPG, PNG o WEBP · hasta 5 MB</p>
+                  </div>
+                )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+                />
+                {errors.photo && <span className="text-xs text-red-500">{errors.photo}</span>}
+              </div>
+            ) : (
+              previewSrc && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-[#1E333A]">Foto de perfil</label>
+                  <div className="flex items-center gap-3 rounded-xl border border-[#e8eef0] bg-[#fafcfc] p-3">
+                    <img
+                      src={previewSrc}
+                      alt="Foto actual"
+                      className="h-16 w-16 rounded-full object-cover border border-[#e8eef0]"
+                    />
+                    <p className="text-[11px] text-[#8aa3ad] leading-relaxed">
+                      Solo el propio empleado puede cambiar su foto desde su perfil.
+                    </p>
                   </div>
                 </div>
-              ) : (
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Subir foto"
-                  onClick={() => fileInputRef.current?.click()}
-                  onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
-                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                  onDragLeave={() => setIsDragging(false)}
-                  onDrop={handleDrop}
-                  className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-7 transition-colors ${
-                    isDragging
-                      ? 'border-[#2ECC71] bg-emerald-50'
-                      : 'border-[#8aa3ad]/50 bg-[#f8fafb] hover:border-[#8aa3ad]'
-                  }`}
-                >
-                  <Upload size={28} className="text-[#8aa3ad]" />
-                  <p className="text-xs text-[#5b6f78]">
-                    Arrastra una imagen o <span className="font-semibold text-emerald-600">haz clic para subirla</span>
-                  </p>
-                  <p className="text-[10px] text-[#8aa3ad]">JPG, PNG o WEBP · hasta 5 MB</p>
-                </div>
-              )}
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-              />
-              {errors.photo && <span className="text-xs text-red-500">{errors.photo}</span>}
-            </div>
+              )
+            )}
 
             {errors.form && (
               <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{errors.form}</p>

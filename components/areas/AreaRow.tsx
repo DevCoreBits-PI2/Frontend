@@ -7,8 +7,10 @@ import { Eye, Pencil, Trash2 } from "lucide-react";
 interface AreaRowProps {
   area: Area;
   onVer: (area: Area) => void;
-  onEditar: (area: Area) => void;
-  onEliminar: (id: string) => void;
+  /** Si vienen `undefined`, los botones correspondientes no se renderizan
+   *  (solo lectura — rol sin permisos de gestión). */
+  onEditar?: (area: Area) => void;
+  onEliminar?: (id: string) => void;
 }
 
 const BADGE_ESTADO: Record<string, string> = {
@@ -71,20 +73,24 @@ export default function AreaRow({ area, onVer, onEditar, onEliminar }: AreaRowPr
           >
             <Eye size={15} />
           </button>
-          <button
-            onClick={() => onEditar(area)}
-            title="Editar area"
-            className="p-1.5 text-[#8aa3ad] hover:text-[#203D47] hover:bg-[#ECEFF1] rounded-lg transition-colors"
-          >
-            <Pencil size={15} />
-          </button>
-          <button
-            onClick={() => onEliminar(area.id)}
-            title="Eliminar area"
-            className="p-1.5 text-[#8aa3ad] hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-          >
-            <Trash2 size={15} />
-          </button>
+          {onEditar && (
+            <button
+              onClick={() => onEditar(area)}
+              title="Editar area"
+              className="p-1.5 text-[#8aa3ad] hover:text-[#203D47] hover:bg-[#ECEFF1] rounded-lg transition-colors"
+            >
+              <Pencil size={15} />
+            </button>
+          )}
+          {onEliminar && (
+            <button
+              onClick={() => onEliminar(area.id)}
+              title="Eliminar area"
+              className="p-1.5 text-[#8aa3ad] hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
         </div>
       </td>
     </tr>

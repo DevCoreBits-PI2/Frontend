@@ -3,18 +3,27 @@
 import React, { useState } from "react";
 import { Area } from "@/services/areasService";
 import AreaRow from "./AreaRow";
-import { Search, Filter, Download } from "lucide-react";
+import { Search, Filter } from "lucide-react";
 
 interface AreasTableProps {
   areas: Area[];
   onVer: (area: Area) => void;
-  onEditar: (area: Area) => void;
-  onEliminar: (id: string) => void;
+  onEditar?: (area: Area) => void;
+  onEliminar?: (id: string) => void;
+  /** Si es `false`, las acciones de fila (editar / eliminar) se ocultan.
+   *  Solo Admin puede gestionar áreas. */
+  puedeGestionar?: boolean;
 }
 
 const ITEMS_POR_PAGINA = 6;
 
-export default function AreasTable({ areas, onVer, onEditar, onEliminar }: AreasTableProps) {
+export default function AreasTable({
+  areas,
+  onVer,
+  onEditar,
+  onEliminar,
+  puedeGestionar = true,
+}: AreasTableProps) {
   const [busqueda, setBusqueda] = useState("");
   const [paginaActual, setPaginaActual] = useState(1);
 
@@ -51,10 +60,6 @@ export default function AreasTable({ areas, onVer, onEditar, onEliminar }: Areas
         <button className="flex items-center gap-2 px-3.5 py-2.5 text-sm text-[#203D47] border border-[#d1dde2] rounded-xl hover:bg-[#ECEFF1] transition-colors">
           <Filter size={14} />
           Filtrar
-        </button>
-        <button className="flex items-center gap-2 px-3.5 py-2.5 text-sm text-[#203D47] border border-[#d1dde2] rounded-xl hover:bg-[#ECEFF1] transition-colors">
-          <Download size={14} />
-          Exportar
         </button>
       </div>
 
@@ -93,8 +98,10 @@ export default function AreasTable({ areas, onVer, onEditar, onEliminar }: Areas
                   key={area.id}
                   area={area}
                   onVer={onVer}
-                  onEditar={onEditar}
-                  onEliminar={onEliminar}
+                  // Si el rol no puede gestionar, no pasamos los handlers.
+                  // AreaRow muestra solo la acción "Ver" en ese caso.
+                  onEditar={puedeGestionar ? onEditar : undefined}
+                  onEliminar={puedeGestionar ? onEliminar : undefined}
                 />
               ))
             )}

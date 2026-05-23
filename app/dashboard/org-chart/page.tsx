@@ -17,6 +17,7 @@ import {
   eliminarJerarquiaPadre,
 } from "@/services/positionsService";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { canEditOrgChart } from "@/lib/auth/roles";
 
 const ALL_AREAS_VALUE = "__ALL__";
 
@@ -69,6 +70,11 @@ function toastError(message: string) {
 
 export default function PositionHierarchyPage() {
   const { authUser } = useAuth();
+  // Solo el admin puede editar el organigrama. Para el resto (HT, jefes,
+  // empleados regulares) el árbol queda en modo solo-lectura: no se pasan
+  // callbacks de edición a OrgTree ni al panel lateral, lo que oculta los
+  // botones de añadir/editar/desvincular y el dropdown de superior.
+  const canEdit = canEditOrgChart(authUser);
   const [areas, setAreas] = useState<Area[]>([]);
   const [allPositions, setAllPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(true);
@@ -322,9 +328,18 @@ export default function PositionHierarchyPage() {
 
       <main className="flex-1 px-6 py-5 flex flex-col gap-4 overflow-hidden">
         <div>
-          <h1 className="text-xl font-bold text-[#0F1819]">Jerarquía de Posiciones</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold text-[#0F1819]">Jerarquía de Posiciones</h1>
+            {!canEdit && (
+              <span className="rounded-full bg-[#f0f4f5] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#576975]">
+                Solo lectura
+              </span>
+            )}
+          </div>
           <p className="text-sm text-[#8aa3ad] mt-0.5">
-            Vista en tiempo real de las relaciones de reporte entre posiciones. Los cambios se sincronizan con la sección de Posiciones.
+            {canEdit
+              ? "Vista en tiempo real de las relaciones de reporte entre posiciones. Los cambios se sincronizan con la sección de Posiciones."
+              : "Vista en tiempo real de las relaciones de reporte entre posiciones. La edición está reservada al administrador."}
           </p>
         </div>
 
@@ -394,9 +409,9 @@ export default function PositionHierarchyPage() {
                 trees={forest as PositionTree[]}
                 selectedId={selected?.id ?? null}
                 onSelect={handleSelect}
-                onAddChild={handleAddChild}
-                onEdit={handleEdit}
-                onDetach={handleDetach}
+                onAddChild={canEdit ? handleAddChild : undefined}
+                onEdit={canEdit ? handleEdit : undefined}
+                onDetach={canEdit ? handleDetach : undefined}
                 scale={scale}
                 onZoomIn={() => setScale((s) => Math.min(2, s + 0.15))}
                 onZoomOut={() => setScale((s) => Math.max(0.3, s - 0.15))}
@@ -409,10 +424,11 @@ export default function PositionHierarchyPage() {
                 reports={editReports}
                 onSuperiorIdChange={setEditSuperiorId}
                 onReportsChange={setEditReports}
-                onSaveSuperior={handleSaveSuperior}
+                onSaveSuperior={canEdit ? handleSaveSuperior : undefined}
                 superiorSaving={savingSuperior}
                 onClose={handleClose}
-                onDetach={handleDetachFromPanel}
+                onDetach={canEdit ? handleDetachFromPanel : undefined}
+                readOnly={!canEdit}
               />
             </>
           )}

@@ -40,15 +40,10 @@ export interface UserProfile {
   cargoId?: number;
   area: string;
   email: string;
-  // El backend de empleados no expone phone/birthdate/office/location.
-  // Se mantienen opcionales para no romper componentes; quedan "" cuando no hay dato.
-  phone: string;
   fechaIngreso: string;
   ubicacion: string;
   foto: string;
   estado: EstadoPerfilUsuario;
-  fechaNacimiento: string;
-  oficina: string;
   reportaA: string;
   // Edad — sí editable vía PATCH /employees/updateUser/:id (UpdateProfileDto.age).
   edad?: number;

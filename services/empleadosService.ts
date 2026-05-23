@@ -14,7 +14,7 @@
 // Las evaluaciones SE PERSISTEN en el backend vía /create-performance-evaluation,
 // pero los componentes existentes esperan la forma `Evaluation`; usamos el adapter.
 
-import { apiGet, apiPatch, apiPost } from "@/lib/api/client";
+import { apiGet, apiPatch, apiPost, ForbiddenError } from "@/lib/api/client";
 import { EMPLOYEES, AREAS, POSITIONS } from "@/lib/api/endpoints";
 import { CAREER_HISTORY, PERFORMANCE } from "@/lib/api/endpoints";
 import { normalizePaginated } from "@/types/api/common";
@@ -64,6 +64,9 @@ export interface Empleado {
   estado: EstadoEmpleado;
   foto: string;
   managerId: number | null;
+  /** Edad en años. El backend la guarda como `age` (UpdateProfileDto valida
+   *  18-100). Puede ser `null` si el empleado nunca la registró. */
+  edad: number | null;
 }
 
 export interface EvaluationCompetency {
@@ -137,6 +140,7 @@ export function dtoToEmpleado(dto: EmployeeDto): Empleado {
     estado: statusToUi(dto.status),
     foto: dto.photo_url ?? "",
     managerId: dto.id_manager,
+    edad: typeof dto.age === "number" ? dto.age : null,
   };
 }
 
@@ -219,7 +223,12 @@ export const obtenerEmpleadoPorId = async (id: string): Promise<Empleado | null>
     const dto = await apiGet<EmployeeDto>(EMPLOYEES.findOne(id));
     const enriched = await enrichEmployeeWithPositionAndArea(dto);
     return dtoToEmpleado(enriched);
-  } catch {
+  } catch (err) {
+    // 403 → re-lanzamos el ForbiddenError para que la página pueda
+    // distinguir "no encontrado" de "no autorizado" y mostrar el mensaje
+    // correcto. Otros errores se tragan y devolvemos null (comportamiento
+    // anterior, evita romper otros callers).
+    if (err instanceof ForbiddenError) throw err;
     return null;
   }
 };
@@ -338,6 +347,7 @@ export const obtenerSubordinadosPorJerarquia = async (
         estado: "ACTIVO",
         foto: emp.photo_url ?? "",
         managerId: null,
+        edad: null,
       });
     }
     return subordinados;
@@ -353,6 +363,30 @@ export const actualizarPerfilEmpleado = async (
   supabaseUserId: string,
   payload: UpdateProfilePayload,
 ): Promise<EmployeeDto> => apiPatch<EmployeeDto>(EMPLOYEES.updateProfile(supabaseUserId), payload);
+
+/**
+ * Variante para uso administrativo: actualiza edad y/o photo_url de OTRO
+ * empleado. El backend (`PATCH /employees/updateUser/:id`) permite a admin/HT
+ * editar a cualquiera; usa el `id_employee` numérico, no el supabase_user_id.
+ *
+ * El endpoint `upload-profile-image` (archivo) NO es utilizable por el admin
+ * para otro empleado — siempre apunta al usuario autenticado. Por eso esta
+ * función solo acepta `photoUrl` (URL ya existente) y `edad`.
+ */
+export const actualizarEmpleadoComoAdmin = async (
+  empleadoId: number,
+  payload: { edad?: number | null; photoUrl?: string },
+): Promise<Empleado> => {
+  const body: UpdateProfilePayload = {
+    id_employee: empleadoId,
+  };
+  if (typeof payload.edad === "number") body.age = payload.edad;
+  if (typeof payload.photoUrl === "string" && payload.photoUrl.trim()) {
+    body.photo_url = payload.photoUrl.trim();
+  }
+  const dto = await apiPatch<EmployeeDto>(EMPLOYEES.updateProfile(empleadoId), body);
+  return dtoToEmpleado(dto);
+};
 
 export const actualizarEmpleado = async (
   employeeId: number | string,

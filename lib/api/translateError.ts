@@ -35,15 +35,15 @@ const RULES: Array<{ match: RegExp; es: string }> = [
   { match: /value.*is out of range for type integer/i, es: "Uno de los valores numéricos excede el máximo permitido por el sistema (probablemente el número de documento)." },
 
   // Permisos genéricos
-  { match: /insufficient employee access/i, es: "No tenés permisos para ver o modificar este empleado." },
-  { match: /forbidden|no tiene permisos/i, es: "No tenés permisos para realizar esta acción." },
+  { match: /insufficient employee access/i, es: "No tienes permisos para ver o modificar este empleado." },
+  { match: /forbidden|no tiene permisos/i, es: "No tienes permisos para realizar esta acción." },
   { match: /unauthorized|no autorizado/i, es: "Tu sesión expiró o no es válida. Inicia sesión de nuevo." },
 
   // Auth / OTP
   { match: /signups not allowed/i, es: "No hay una cuenta con ese correo. Confirma con tu administrador." },
   { match: /token has expired|otp expired/i, es: "El código expiró. Solicita uno nuevo." },
   { match: /invalid otp|otp invalid/i, es: "El código es incorrecto." },
-  { match: /rate limit|too many/i, es: "Demasiados intentos. Esperá unos minutos antes de reintentar." },
+  { match: /rate limit|too many/i, es: "Demasiados intentos. Espera unos minutos antes de reintentar." },
 ];
 
 /**

@@ -268,6 +268,12 @@ async function enrichPositionsWithEmployees(items: Position[]): Promise<void> {
     for (const emp of employees) {
       const positionId = emp.id_position;
       if (!positionId) continue;
+      // Los empleados retirados o inactivos liberan el cargo: no se cuentan
+      // como ocupantes. Activos, invitados y suspendidos siguen ocupándolo
+      // (el backend no actualiza id_position al cambiar status, así que
+      // filtramos en el frontend para que las vacantes y avatares reflejen
+      // solo a quienes están vinculados al cargo).
+      if (emp.status === "retired" || emp.status === "inactive") continue;
       const empId = emp.id ?? emp.id_employee ?? 0;
       const nombre = `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() || `Empleado ${empId}`;
       const entry = {
@@ -285,6 +291,10 @@ async function enrichPositionsWithEmployees(items: Position[]): Promise<void> {
       const enriched = byPosition.get(position.rawId);
       if (enriched && enriched.length > 0) {
         position.empleados = enriched;
+      } else {
+        // Si el cargo ya no tiene empleados activos, vaciamos la lista
+        // (antes podía conservar empleados retirados del fetch inicial).
+        position.empleados = [];
       }
     }
   } catch {

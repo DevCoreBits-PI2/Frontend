@@ -119,7 +119,7 @@ export default function RegisterForm() {
     setSubmitting(true);
     try {
       await updatePassword(password);
-      toast.success("Contraseña creada. Ahora podés iniciar sesión.");
+      toast.success("Contraseña creada. Ahora puedes iniciar sesión.");
       router.push("/login");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "No se pudo crear la contraseña.";
@@ -163,7 +163,7 @@ export default function RegisterForm() {
         Definir contraseña
       </h2>
       <p className="text-xs text-center text-gray-500 -mt-2">
-        Es tu primer ingreso. Definí una contraseña segura para activar tu cuenta.
+        Es tu primer ingreso. Define una contraseña segura para activar tu cuenta.
       </p>
 
       <InputField

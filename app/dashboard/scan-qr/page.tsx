@@ -35,7 +35,7 @@ function EscanearQrContenido() {
     e?.preventDefault();
     const t = token.trim();
     if (!t) {
-      toast.error("Ingresá o pegá el token QR.");
+      toast.error("Ingresa o pega el token QR.");
       return;
     }
     setLoading(true);
@@ -90,7 +90,7 @@ function EscanearQrContenido() {
               value={token}
               onChange={(e) => setToken(e.target.value)}
               rows={3}
-              placeholder="Pegá el token JWT que aparece en el QR del empleado..."
+              placeholder="Pega el token JWT que aparece en el QR del empleado..."
               className="w-full resize-none rounded-lg border border-[#d1dde2] px-3.5 py-2.5 text-sm font-mono text-[#0F1819] focus:outline-none focus:ring-2 focus:ring-emerald-400"
             />
             <div className="flex items-center justify-between gap-2">

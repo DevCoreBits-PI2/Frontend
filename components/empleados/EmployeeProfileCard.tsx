@@ -7,6 +7,7 @@ import {
   Empleado,
   EstadoEmpleado,
   actualizarEmpleado,
+  actualizarEmpleadoComoAdmin,
   obtenerSubordinadosPorJerarquia,
   statusToBackend,
 } from "@/services/empleadosService";
@@ -133,11 +134,22 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado, onEmpl
   const [subordinadosLoading, setSubordinadosLoading] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Local editable state to reflect edits performed via modal
+  // Local editable state to reflect edits performed via modal. Se resincronizan
+  // cuando el `empleado` prop cambia (p.ej. después de re-fetch por refresh).
   const [nombreLocal, setNombreLocal] = useState(empleado.nombre);
   const [apellidosLocal, setApellidosLocal] = useState(empleado.apellidos);
   const [emailLocal, setEmailLocal] = useState(empleado.email);
+  const [edadLocal, setEdadLocal] = useState<number | null>(empleado.edad);
+  const [fotoLocal, setFotoLocal] = useState<string>(empleado.foto);
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
+
+  useEffect(() => {
+    setNombreLocal(empleado.nombre);
+    setApellidosLocal(empleado.apellidos);
+    setEmailLocal(empleado.email);
+    setEdadLocal(empleado.edad);
+    setFotoLocal(empleado.foto);
+  }, [empleado.rawId, empleado.nombre, empleado.apellidos, empleado.email, empleado.edad, empleado.foto]);
   const [toastEditVisible, setToastEditVisible] = useState(false);
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [evaluaciones, setEvaluaciones] = useState<PerformanceEvaluationDto[]>([]);
@@ -350,9 +362,18 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado, onEmpl
             <div className="flex flex-1 items-start gap-6">
               {/* Avatar */}
               <div className="relative shrink-0">
-                <div className="w-20 h-20 rounded-lg border-4 border-[#BDD5EA] bg-gradient-to-br from-[#203D47] to-[#0F1819] flex items-center justify-center text-white text-xl font-bold shadow-sm">
-                  {iniciales}
-                </div>
+                {fotoLocal ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={fotoLocal}
+                    alt={`${nombreLocal} ${apellidosLocal}`}
+                    className="w-20 h-20 rounded-lg border-4 border-[#BDD5EA] object-cover shadow-sm"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-lg border-4 border-[#BDD5EA] bg-gradient-to-br from-[#203D47] to-[#0F1819] flex items-center justify-center text-white text-xl font-bold shadow-sm">
+                    {iniciales}
+                  </div>
+                )}
                 <div
                   className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white transition-colors duration-300 ${
                     empleado.estado === "ACTIVO"
@@ -406,39 +427,46 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado, onEmpl
 
                 {menuAbierto && (
                   <div className="absolute right-0 mt-1 bg-white border border-[#d1dde2] rounded-xl shadow-lg py-2 z-20 min-w-max">
-                    <button
-                      className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-[#f4f7f8] flex items-center gap-2 transition-colors"
-                      onClick={() => {
-                        setMenuAbierto(false);
-                        setModalEditarAbierto(true);
-                      }}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-[#f4f7f8] flex items-center gap-2 transition-colors"
-                      onClick={() => {
-                        setMenuAbierto(false);
-                        setModalEstadoAbierto(true);
-                      }}
-                    >
-                      Cambiar estado
-                    </button>
-                    {empleado.estado === "INVITADO" && (
+                    {empleado.estado === "INVITADO" ? (
+                      // Empleado invitado: aún no aceptó la invitación. No
+                      // tiene sesión activa ni perfil consolidado, así que
+                      // las acciones "Editar" y "Cambiar estado" no aplican.
+                      // Lo único razonable es reenviar la invitación.
                       <button
                         className="w-full px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 flex items-center gap-2 transition-colors"
                         onClick={handleReenviarInvitacion}
                       >
                         Reenviar invitación
                       </button>
-                    )}
-                    {authUser?.isAdmin && empleado.estado !== "SUSPENDIDO" && empleado.estado !== "INVITADO" && (
-                      <button
-                        className="w-full px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2 transition-colors border-t border-[#f0f4f5]"
-                        onClick={handleSuspenderAdmin}
-                      >
-                        Suspender cuenta (admin)
-                      </button>
+                    ) : (
+                      <>
+                        <button
+                          className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-[#f4f7f8] flex items-center gap-2 transition-colors"
+                          onClick={() => {
+                            setMenuAbierto(false);
+                            setModalEditarAbierto(true);
+                          }}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-[#f4f7f8] flex items-center gap-2 transition-colors"
+                          onClick={() => {
+                            setMenuAbierto(false);
+                            setModalEstadoAbierto(true);
+                          }}
+                        >
+                          Cambiar estado
+                        </button>
+                        {authUser?.isAdmin && empleado.estado !== "SUSPENDIDO" && (
+                          <button
+                            className="w-full px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2 transition-colors border-t border-[#f0f4f5]"
+                            onClick={handleSuspenderAdmin}
+                          >
+                            Suspender cuenta (admin)
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -447,6 +475,33 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado, onEmpl
           </div>
         </div>
       </div>
+
+      {/* Alertas de estado: suspendido o retirado.
+          El backend no guarda duración de suspensión: solo el flag `status`.
+          La cuenta queda inhabilitada hasta que un admin la desbloquee. */}
+      {empleado.estado === "SUSPENDIDO" && (
+        <div className="border-b border-amber-200 bg-amber-50">
+          <div className="mx-auto flex max-w-7xl items-start gap-3 px-6 py-3 text-sm text-amber-800">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-400 text-[10px] font-bold text-white">!</span>
+            <p>
+              <strong>Cuenta suspendida.</strong> {empleado.nombre} no puede iniciar sesión en
+              el sistema mientras esté en este estado. Un administrador puede desbloquearla desde
+              el panel de Administradores.
+            </p>
+          </div>
+        </div>
+      )}
+      {empleado.estado === "RETIRADO" && (
+        <div className="border-b border-rose-200 bg-rose-50">
+          <div className="mx-auto flex max-w-7xl items-start gap-3 px-6 py-3 text-sm text-rose-800">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">i</span>
+            <p>
+              <strong>Empleado retirado.</strong> El cargo de {empleado.cargo} queda liberado y
+              puede ser asignado a otro empleado. El historial permanece para consulta.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-[#d1dde2] bg-white">
@@ -488,13 +543,18 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado, onEmpl
                   <h2 className="text-lg font-bold text-[#0F1819]">
                     Trayectoria Profesional
                   </h2>
-                  <button
-                    onClick={() => setModalCambioAbierto(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-400 rounded-lg transition-colors"
-                  >
-                    <Plus size={13} />
-                    Registrar Cambio Laboral
-                  </button>
+                  {/* Solo se puede registrar un cambio laboral sobre un
+                      empleado ya activo. Para los invitados todavía no hay
+                      relación laboral, así que el botón no aplica. */}
+                  {empleado.estado !== "INVITADO" && (
+                    <button
+                      onClick={() => setModalCambioAbierto(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-400 rounded-lg transition-colors"
+                    >
+                      <Plus size={13} />
+                      Registrar Cambio Laboral
+                    </button>
+                  )}
                 </div>
 
                 {trayectoriaLoading && (
@@ -598,12 +658,21 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado, onEmpl
                 ) : (
                   <ul className="divide-y divide-[#f0f4f5]">
                     {subordinados.map((s) => {
-                      const iniciales = `${s.nombre.charAt(0)}${s.apellidos.charAt(0)}`.toUpperCase();
+                      const inicialesSub = `${s.nombre.charAt(0)}${s.apellidos.charAt(0)}`.toUpperCase();
                       return (
                         <li key={s.id} className="flex items-center gap-3 py-3">
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#203D47] to-[#0F1819] flex items-center justify-center text-white text-xs font-bold shrink-0">
-                            {iniciales}
-                          </div>
+                          {s.foto ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={s.foto}
+                              alt={`${s.nombre} ${s.apellidos}`}
+                              className="w-9 h-9 rounded-full object-cover shrink-0 border border-[#e8eef0]"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#203D47] to-[#0F1819] flex items-center justify-center text-white text-xs font-bold shrink-0">
+                              {inicialesSub}
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-[#0F1819] truncate">
                               {s.nombre} {s.apellidos}
@@ -649,8 +718,10 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado, onEmpl
                         <p className="break-words text-xs font-medium text-[#0F1819]">{emailLocal}</p>
                   </div>
                   <div>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">Tipo de contrato</p>
-                    <p className="text-xs font-medium text-[#0F1819]">{tipoEmpleoActual}</p>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">Edad</p>
+                    <p className="text-xs font-medium text-[#0F1819]">
+                      {edadLocal != null ? `${edadLocal} años` : "—"}
+                    </p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 pt-2">
@@ -663,15 +734,21 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado, onEmpl
                     <p className="text-xs font-medium text-[#0F1819]">{empleado.departamento}</p>
                   </div>
                 </div>
-                <div className="border-t border-[#f0f4f5] pt-2">
-                  <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">Reporta a</p>
-                  <p className="text-xs font-medium text-[#0F1819]">
-                    {empleado.superiorEmpleadoNombre && empleado.cargoSuperiorNombre
-                      ? `${empleado.superiorEmpleadoNombre} — ${empleado.cargoSuperiorNombre}`
-                      : empleado.cargoSuperiorNombre
-                        ? empleado.cargoSuperiorNombre
-                        : "—"}
-                  </p>
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">Tipo de contrato</p>
+                    <p className="text-xs font-medium text-[#0F1819]">{tipoEmpleoActual}</p>
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">Reporta a</p>
+                    <p className="text-xs font-medium text-[#0F1819]">
+                      {empleado.superiorEmpleadoNombre && empleado.cargoSuperiorNombre
+                        ? `${empleado.superiorEmpleadoNombre} — ${empleado.cargoSuperiorNombre}`
+                        : empleado.cargoSuperiorNombre
+                          ? empleado.cargoSuperiorNombre
+                          : "—"}
+                    </p>
+                  </div>
                 </div>
               </div>
               </div>
@@ -790,11 +867,12 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado, onEmpl
         }}
       />
 
-      {/* Edit Info Modal — la edición de otro empleado por un admin va por
-          /employees/updateEmployee (otra sección, distinto endpoint). Este
-          modal solo permite editar edad/foto; lo conservamos para mostrar la
-          info actual del empleado. La persistencia aquí se conectará cuando
-          atendamos la sección de empleados. */}
+      {/* Edit Info Modal — uso administrativo.
+          El backend permite (PATCH /employees/updateUser/:id) que admin/HT
+          actualice edad y/o photo_url de cualquier empleado. La subida de
+          archivo (PATCH /employees/upload-profile-image) NO acepta target ID
+          — siempre sube al usuario autenticado — por eso ocultamos esa
+          sección y dejamos solo edad editable desde aquí. */}
       <EditInfoModal
         isOpen={modalEditarAbierto}
         onClose={() => setModalEditarAbierto(false)}
@@ -802,10 +880,26 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado, onEmpl
           fullName: `${nombreLocal} ${apellidosLocal}`.trim(),
           emailAddress: emailLocal,
         }}
-        initialValues={{ edad: null, currentPhotoUrl: "" }}
-        onSave={async () => {
-          setModalEditarAbierto(false);
-          setToastEditVisible(true);
+        initialValues={{ edad: edadLocal, currentPhotoUrl: fotoLocal }}
+        allowPhotoUpload={false}
+        onSave={async (data) => {
+          try {
+            const empleadoActualizado = await actualizarEmpleadoComoAdmin(
+              empleado.rawId,
+              { edad: data.edad },
+            );
+            // Sincroniza el estado local inmediatamente y dispara el
+            // re-fetch en el page padre por si otras vistas dependen.
+            setEdadLocal(empleadoActualizado.edad);
+            setFotoLocal(empleadoActualizado.foto);
+            setModalEditarAbierto(false);
+            setToastEditVisible(true);
+            await onEmpleadoActualizado?.();
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "No se pudo guardar.";
+            // Re-lanzamos para que el modal muestre el error inline.
+            throw new Error(msg);
+          }
         }}
       />
 

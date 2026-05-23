@@ -120,16 +120,15 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange, errors = {} }) => {
           <FieldError message={errors.email} />
         </div>
 
-        {/* Edad — requerida por el backend (@IsInt). El form no la pedía y se */}
-        {/* guardaba como 0 por defecto. */}
+        {/* Edad — el backend la valida como entero entre 18 y 100. */}
         <div>
           <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
             Edad
           </label>
           <input
             type="number"
-            min={0}
-            max={120}
+            min={18}
+            max={100}
             value={data.age ?? ""}
             onChange={(e) => {
               const v = e.target.value;

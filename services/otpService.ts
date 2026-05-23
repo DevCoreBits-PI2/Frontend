@@ -33,7 +33,7 @@ export async function solicitarOtp(email: string): Promise<void> {
     }
     if (lower.includes("rate limit") || lower.includes("too many")) {
       throw new Error(
-        "Demasiados intentos. Esperá unos minutos antes de pedir otro código.",
+        "Demasiados intentos. Espera unos minutos antes de pedir otro código.",
       );
     }
     throw new Error(error.message);
@@ -60,7 +60,7 @@ export async function verificarOtp(email: string, token: string): Promise<void> 
       throw new Error("El código expiró. Solicita uno nuevo.");
     }
     if (lower.includes("invalid")) {
-      throw new Error("El código es incorrecto. Revisá los 6 dígitos del correo.");
+      throw new Error("El código es incorrecto. Revisa los 6 dígitos del correo.");
     }
     throw new Error(error?.message ?? "No se pudo verificar el código.");
   }

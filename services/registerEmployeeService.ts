@@ -61,7 +61,6 @@ export interface RegisterPayload {
   documentType: string;
   documentNumber: string;
   email: string;
-  phone: string;
   photo?: string;
   files?: { name: string; size: number; type: string }[];
   // Solo asignación organizacional. Tipo/fecha/condiciones del contrato viven

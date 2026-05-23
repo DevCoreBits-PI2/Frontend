@@ -125,6 +125,11 @@ export default function OrgNode({
     );
   }
 
+  // Solo renderizamos el menú contextual si al menos una acción está
+  // disponible (Editar o Desvincular). En modo solo-lectura ambas vienen en
+  // `undefined`, así el menú directamente no aparece.
+  const showMenu = !!onEdit || !!onDetach;
+
   /* ── LEAF NODE ── */
   if (isLeaf) {
     return (
@@ -132,7 +137,9 @@ export default function OrgNode({
       <div className="relative inline-block" data-nodecard>
         <button
           onClick={() => onClick(position)}
-          className={`flex flex-col rounded-xl px-4 py-3 min-w-[155px] cursor-pointer transition-all duration-200 select-none text-left pr-9 ${
+          className={`flex flex-col rounded-xl px-4 py-3 min-w-[155px] cursor-pointer transition-all duration-200 select-none text-left ${
+            showMenu ? "pr-9" : "pr-4"
+          } ${
             isSelected
               ? "bg-white ring-2 ring-emerald-500 shadow-md"
               : "bg-white ring-1 ring-[#d1dde2] hover:ring-[#b0c4cc] hover:shadow-sm"
@@ -143,9 +150,11 @@ export default function OrgNode({
             {position.department} • {position.employeeCount} Personas
           </span>
         </button>
-        <div className="absolute top-2 right-1.5">
-          <ContextMenu position={position} onEdit={onEdit} onDetach={onDetach} />
-        </div>
+        {showMenu && (
+          <div className="absolute top-2 right-1.5">
+            <ContextMenu position={position} onEdit={onEdit} onDetach={onDetach} />
+          </div>
+        )}
       </div>
     );
   }
@@ -157,7 +166,9 @@ export default function OrgNode({
     <div className="relative inline-block" data-nodecard>
       <button
         onClick={() => onClick(position)}
-        className={`relative flex flex-col rounded-xl p-4 min-w-[190px] cursor-pointer transition-all duration-200 select-none text-left pr-10 ${
+        className={`relative flex flex-col rounded-xl p-4 min-w-[190px] cursor-pointer transition-all duration-200 select-none text-left ${
+          showMenu ? "pr-10" : "pr-4"
+        } ${
           isSelected
             ? "bg-white ring-2 ring-emerald-500 shadow-md"
             : "bg-white ring-1 ring-[#d1dde2] hover:ring-[#b0c4cc] hover:shadow-sm"
@@ -168,7 +179,7 @@ export default function OrgNode({
             <Icon size={15} />
           </div>
           {/* Spacer for grip area */}
-          <div className="w-5 h-5" />
+          {showMenu && <div className="w-5 h-5" />}
         </div>
         <span className="text-[#0F1819] font-semibold text-sm leading-tight">{position.name}</span>
         <span className="text-[9px] font-semibold tracking-widest uppercase text-[#8aa3ad] mt-1">
@@ -179,9 +190,11 @@ export default function OrgNode({
         </span>
         <span className="text-[11px] text-[#8aa3ad] mt-2">{position.employeeCount} Empleados</span>
       </button>
-      <div className="absolute top-3 right-2.5">
-        <ContextMenu position={position} onEdit={onEdit} onDetach={onDetach} />
-      </div>
+      {showMenu && (
+        <div className="absolute top-3 right-2.5">
+          <ContextMenu position={position} onEdit={onEdit} onDetach={onDetach} />
+        </div>
+      )}
     </div>
   );
 }

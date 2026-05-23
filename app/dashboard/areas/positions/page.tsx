@@ -28,7 +28,6 @@ import {
 import { translateBackendError } from "@/lib/api/translateError";
 import { obtenerAreas, type Area } from "@/services/areasService";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { canManageHumanTalent } from "@/lib/auth/roles";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES & INTERFACES
@@ -366,7 +365,9 @@ function NewPositionModal({
 
 export default function PositionsPage() {
   const { authUser } = useAuth();
-  const puedeGestionar = authUser ? canManageHumanTalent(authUser) : false;
+  // Crear, editar y eliminar posiciones: SOLO Admin. Cualquier otro rol
+  // (incluyendo HT) solo puede ver los detalles.
+  const puedeGestionar = !!authUser?.isAdmin;
   const [posicionAVer, setPosicionAVer] = useState<Position | null>(null); //Nuevos estados
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null); //Nuevos estados
   const [positions, setPositions] = useState<Position[]>([]);
@@ -681,45 +682,51 @@ return (
             <Eye className="w-4 h-4" />
             Ver detalles
           </button>
-          <button
-            onClick={() => {
-              const pos = positions.find((p) => p.id === openMenuId);
-              if (pos) {
-                handleAbrirEditar(pos);
-              }
-            }}
-            className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-gray-100 flex items-center gap-2 transition-colors"
-          >
-            <Pencil className="w-4 h-4" />
-            Editar
-          </button>
-          {(() => {
-            const pos = positions.find((p) => p.id === openMenuId);
-            if (pos?.estado === "Inactive") {
-              return (
-                <button
-                  onClick={() => handleActivar(pos)}
-                  className="w-full px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 flex items-center gap-2 transition-colors"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Activar
-                </button>
-              );
-            }
-            return null;
-          })()}
-          <button
-            onClick={() => {
-              const pos = positions.find((p) => p.id === openMenuId);
-              if (pos) {
-                handleAbrirEliminar(pos);
-              }
-            }}
-            className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-            Eliminar
-          </button>
+          {/* Editar / Activar / Eliminar: solo Admin. Los demás roles ven
+              únicamente "Ver detalles". */}
+          {puedeGestionar && (
+            <>
+              <button
+                onClick={() => {
+                  const pos = positions.find((p) => p.id === openMenuId);
+                  if (pos) {
+                    handleAbrirEditar(pos);
+                  }
+                }}
+                className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-gray-100 flex items-center gap-2 transition-colors"
+              >
+                <Pencil className="w-4 h-4" />
+                Editar
+              </button>
+              {(() => {
+                const pos = positions.find((p) => p.id === openMenuId);
+                if (pos?.estado === "Inactive") {
+                  return (
+                    <button
+                      onClick={() => handleActivar(pos)}
+                      className="w-full px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 flex items-center gap-2 transition-colors"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Activar
+                    </button>
+                  );
+                }
+                return null;
+              })()}
+              <button
+                onClick={() => {
+                  const pos = positions.find((p) => p.id === openMenuId);
+                  if (pos) {
+                    handleAbrirEliminar(pos);
+                  }
+                }}
+                className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Eliminar
+              </button>
+            </>
+          )}
         </div>
       )}
 

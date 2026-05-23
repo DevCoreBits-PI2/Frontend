@@ -207,7 +207,6 @@ const Page = () => {
         documentType: data.documentType ?? "",
         documentNumber: data.documentNumber ?? "",
         email: data.email ?? "",
-        phone: "",
         photo: data.photo,
         areaId: data.areaId,
         positionId: data.positionId,

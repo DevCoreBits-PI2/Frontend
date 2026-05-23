@@ -164,11 +164,11 @@ export default function PaginaEditarContrato() {
     // El bloqueo por tipo INDEFINIDO gana sobre el bloqueo por estado: un
     // indefinido ACTIVO igual no se debería editar acá.
     if (contrato.estado === "ACTIVO" && contrato.tipo === "INDEFINIDO") {
-      return "Los contratos indefinidos no se editan desde acá. Cualquier cambio en las condiciones requiere anular este contrato y crear uno nuevo, para mantener trazabilidad legal.";
+      return "Los contratos indefinidos no se editan desde aquí. Cualquier cambio en las condiciones requiere anular este contrato y crear uno nuevo, para mantener trazabilidad legal.";
     }
     switch (contrato.estado) {
       case "EXPIRADO":
-        return "El contrato ya expiró. No se permite modificarlo; podés renovarlo o crear uno nuevo.";
+        return "El contrato ya expiró. No se permite modificarlo; puedes renovarlo o crear uno nuevo.";
       case "RENOVADO":
         return "Este contrato fue renovado y forma parte del historial laboral. Edita el contrato renovado vigente o crea uno nuevo.";
       case "ANULADO":
@@ -271,7 +271,7 @@ export default function PaginaEditarContrato() {
             <div>
               <p className="text-sm font-semibold text-sky-700">Contrato fijo activo — alcance acotado</p>
               <p className="text-xs text-sky-600">
-                Acá solo podés ajustar la <strong>fecha de fin</strong> y las <strong>notas</strong>.
+                Aquí solo puedes ajustar la <strong>fecha de fin</strong> y las <strong>notas</strong>.
                 Para cambiar el tipo, las condiciones estructurales o el PDF, anula este
                 contrato y crea uno nuevo desde el módulo de contratos.
               </p>
