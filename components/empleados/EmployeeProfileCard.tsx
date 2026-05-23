@@ -3,12 +3,20 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { MapPin, Calendar, MoreVertical, Plus } from "lucide-react";
-import { Empleado, EstadoEmpleado } from "@/services/empleadosService";
+import {
+  Empleado,
+  EstadoEmpleado,
+  actualizarEmpleado,
+  obtenerSubordinadosPorJerarquia,
+  statusToBackend,
+} from "@/services/empleadosService";
+import { reenviarInvitacion, suspenderEmpleado } from "@/services/adminService";
+import { useAuth } from "@/lib/auth/AuthContext";
 import ChangeStatusModal from "@/components/empleados/ChangeStatusModal";
 import RegisterWorkChangeModal from "@/components/empleados/RegisterWorkChangeModal";
 import ToastNotification from "@/components/ToastNotification";
 import EditInfoModal from "@/components/perfil/EditInfoModal";
-import { Contrato, obtenerContratosPorEmpleado } from "@/services/contratosService";
+import { Contrato, TIPO_CONTRATO_LABEL, obtenerContratosPorEmpleado } from "@/services/contratosService";
 import { listarEvaluacionesPorEmpleado } from "@/services/evaluacionService";
 import {
   crearEventoCarrera,
@@ -23,7 +31,9 @@ import { PerformanceMain, PerformanceSidebar } from "@/components/perfil/Perform
 
 interface Props {
   empleado: Empleado;
-  onEstadoCambiado: (nuevoEstado: EstadoEmpleado) => void;
+  onEstadoCambiado: (nuevoEstado: EstadoEmpleado, motivo: string) => void;
+  /** Se invoca cuando algún cambio (cargo/manager) requiere recargar el empleado. */
+  onEmpleadoActualizado?: () => Promise<void> | void;
 }
 
 const CONFIG_ESTADO: Record<
@@ -80,7 +90,7 @@ function StatusToggle({ estado }: { estado: EstadoEmpleado }) {
   );
 }
 
-type TabActiva = "trayectoria" | "contratos" | "desempeño";
+type TabActiva = "trayectoria" | "contratos" | "desempeño" | "equipo";
 
 // Mismos labels que usa el perfil propio (UserProfileCard) para los tipos del backend.
 const CAREER_TYPE_LABEL: Record<string, string> = {
@@ -92,11 +102,12 @@ const CAREER_TYPE_LABEL: Record<string, string> = {
 };
 
 // Mapeo entre los tipos UI del modal (RegisterWorkChangeModal) y los tipos
-// que acepta el backend en `CreateCareerHistoryPayload.type`.
+// que acepta el backend en `CreateCareerHistoryPayload.type`. Quitamos
+// `modificacion_contractual` porque no se expone desde el modal — la edición
+// del contrato se hace desde el módulo de Contratos directamente.
 const UI_TIPO_TO_BACKEND: Record<string, CareerTypeChange> = {
   traslado: "transfer",
   ascenso: "promotion",
-  modificacion_contractual: "contract_modification",
   cambio_salarial: "salary_change",
 };
 
@@ -107,7 +118,8 @@ function formatCareerDate(iso: string): string {
   return d.toLocaleDateString("es-ES", { month: "short", year: "numeric" }).toUpperCase();
 }
 
-export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Props) {
+export default function EmployeeProfileCard({ empleado, onEstadoCambiado, onEmpleadoActualizado }: Props) {
+  const { authUser } = useAuth();
   const [tabActiva, setTabActiva] = useState<TabActiva>("trayectoria");
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [modalEstadoAbierto, setModalEstadoAbierto] = useState(false);
@@ -117,6 +129,8 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
   const [trayectoria, setTrayectoria] = useState<CareerHistoryDto[]>([]);
   const [trayectoriaLoading, setTrayectoriaLoading] = useState(false);
   const [trayectoriaError, setTrayectoriaError] = useState<string | null>(null);
+  const [subordinados, setSubordinados] = useState<Empleado[]>([]);
+  const [subordinadosLoading, setSubordinadosLoading] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Local editable state to reflect edits performed via modal
@@ -152,6 +166,15 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
       .replace(/^(\w)/, (c) => c.toUpperCase())
       .replace(/\./g, "");
   }, [fechaIngreso]);
+
+  // Tipo de empleo real, derivado del contrato ACTIVO actual del empleado.
+  // El backend no guarda "tipo de empleo" en `employees`; vive en `contracts`.
+  // Si no hay contrato vigente, mostramos "Sin contrato" (transparente).
+  const tipoEmpleoActual = useMemo(() => {
+    const vigente = contratos.find((c) => c.estado === "ACTIVO");
+    if (!vigente) return "Sin contrato vigente";
+    return TIPO_CONTRATO_LABEL[vigente.tipo] ?? vigente.tipo;
+  }, [contratos]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -190,6 +213,35 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
     fetchTrayectoria();
   }, [fetchTrayectoria]);
 
+  // Equipo directo derivado de la jerarquía de cargos
+  // (positions.parent_position_id), no de employees.id_manager. Así nunca se
+  // desactualiza: al cambiar el cargo padre del empleado, la lista refleja
+  // automáticamente a los nuevos subordinados sin depender de que alguien
+  // actualice manualmente el campo id_manager.
+  useEffect(() => {
+    let mounted = true;
+    if (!empleado.cargoId) {
+      setSubordinados([]);
+      setSubordinadosLoading(false);
+      return;
+    }
+    setSubordinadosLoading(true);
+    obtenerSubordinadosPorJerarquia(empleado.cargoId)
+      .then((data) => {
+        if (!mounted) return;
+        // Excluimos al propio empleado del listado (caso borde donde un cargo
+        // se tiene a sí mismo como padre por error de datos).
+        setSubordinados(data.filter((s) => s.rawId !== empleado.rawId));
+      })
+      .catch(() => {
+        if (mounted) setSubordinados([]);
+      })
+      .finally(() => {
+        if (mounted) setSubordinadosLoading(false);
+      });
+    return () => { mounted = false; };
+  }, [empleado.cargoId, empleado.rawId]);
+
   const trayectoriaOrdenada = useMemo(
     () =>
       [...trayectoria].sort(
@@ -218,11 +270,62 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
     return () => { mounted = false; };
   }, [empleado.rawId]);
 
+  // Acción admin: suspende al empleado vía /api/admin/suspendEmployee/:id.
+  // Esta es distinta a `cambiarEstado` (que hace updateEmployee); el endpoint
+  // admin bloquea la sesión Supabase del usuario también.
+  const handleSuspenderAdmin = async () => {
+    setMenuAbierto(false);
+    const confirma = window.confirm(
+      `¿Suspender la cuenta de ${empleado.nombre}? El empleado no podrá iniciar sesión hasta que un admin lo desbloquee.`,
+    );
+    if (!confirma) return;
+    try {
+      await suspenderEmpleado(empleado.rawId);
+      await onEmpleadoActualizado?.();
+      setToastMsg({
+        title: "Empleado suspendido",
+        message: `${empleado.nombre} fue suspendido. No podrá iniciar sesión.`,
+      });
+      setToastVisible(true);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : "";
+      setToastMsg({
+        title: "Error",
+        message: raw || "No se pudo suspender al empleado.",
+      });
+      setToastVisible(true);
+    }
+  };
+
+  // Reenvía la invitación de Supabase al correo del empleado. El backend exige
+  // status='invited'; el botón se muestra solo en ese caso.
+  const handleReenviarInvitacion = async () => {
+    setMenuAbierto(false);
+    try {
+      await reenviarInvitacion(empleado.rawId);
+      setToastMsg({
+        title: "Invitación reenviada",
+        message: `Se envió un nuevo correo de invitación a ${empleado.email}.`,
+      });
+      setToastVisible(true);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : "";
+      let msg = raw || "No se pudo reenviar la invitación.";
+      if (raw.toLowerCase().includes("solo se puede reenviar")) {
+        msg = "Solo se puede reenviar a empleados que aún no han activado su cuenta.";
+      }
+      setToastMsg({ title: "Error", message: msg });
+      setToastVisible(true);
+    }
+  };
+
   const handleConfirmarEstado = async (
     nuevoEstado: EstadoEmpleado,
-    _motivo: string
+    motivo: string,
   ) => {
-    onEstadoCambiado(nuevoEstado);
+    // El motivo escrito por el admin se propaga al servicio: se persiste como
+    // descripción del evento en career_history para mantener trazabilidad.
+    onEstadoCambiado(nuevoEstado, motivo);
     setModalEstadoAbierto(false);
     setToastMsg(
       nuevoEstado === "RETIRADO"
@@ -279,10 +382,12 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                       Ingresó {fechaIngresoFormateada}
                     </span>
                   )}
-                  <span className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    {empleado.ubicacion}
-                  </span>
+                  {empleado.ubicacion && (
+                    <span className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      {empleado.ubicacion}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -301,15 +406,15 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
 
                 {menuAbierto && (
                   <div className="absolute right-0 mt-1 bg-white border border-[#d1dde2] rounded-xl shadow-lg py-2 z-20 min-w-max">
-                        <button
-                          className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-[#f4f7f8] flex items-center gap-2 transition-colors"
-                          onClick={() => {
-                            setMenuAbierto(false);
-                            setModalEditarAbierto(true);
-                          }}
-                        >
-                          Editar
-                        </button>
+                    <button
+                      className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-[#f4f7f8] flex items-center gap-2 transition-colors"
+                      onClick={() => {
+                        setMenuAbierto(false);
+                        setModalEditarAbierto(true);
+                      }}
+                    >
+                      Editar
+                    </button>
                     <button
                       className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-[#f4f7f8] flex items-center gap-2 transition-colors"
                       onClick={() => {
@@ -319,6 +424,22 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                     >
                       Cambiar estado
                     </button>
+                    {empleado.estado === "INVITADO" && (
+                      <button
+                        className="w-full px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 flex items-center gap-2 transition-colors"
+                        onClick={handleReenviarInvitacion}
+                      >
+                        Reenviar invitación
+                      </button>
+                    )}
+                    {authUser?.isAdmin && empleado.estado !== "SUSPENDIDO" && empleado.estado !== "INVITADO" && (
+                      <button
+                        className="w-full px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2 transition-colors border-t border-[#f0f4f5]"
+                        onClick={handleSuspenderAdmin}
+                      >
+                        Suspender cuenta (admin)
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -335,6 +456,10 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
               { id: "trayectoria", label: "Trayectoria", icon: "◆" },
               { id: "contratos", label: "Contratos", icon: "□" },
               { id: "desempeño", label: "Desempeño", icon: "▽" },
+              // Solo mostramos "Equipo Directo" si efectivamente tiene gente a cargo.
+              ...(subordinados.length > 0
+                ? [{ id: "equipo", label: `Equipo Directo (${subordinados.length})`, icon: "◇" }]
+                : []),
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -455,6 +580,52 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                 error={evaluacionesError}
               />
             )}
+
+            {tabActiva === "equipo" && (
+              <div className="rounded-xl bg-white p-6 shadow-sm border border-[#e4ebee]">
+                <div className="mb-4">
+                  <h2 className="text-lg font-bold text-[#0F1819]">Equipo Directo</h2>
+                  <p className="text-xs text-[#8aa3ad] mt-0.5">
+                    Empleados que ocupan cargos que reportan al cargo de {empleado.nombre} ({empleado.cargo}).
+                  </p>
+                </div>
+                {subordinadosLoading ? (
+                  <p className="py-6 text-center text-sm text-[#8aa3ad]">Cargando equipo...</p>
+                ) : subordinados.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-[#8aa3ad]">
+                    Este empleado no tiene subordinados directos.
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-[#f0f4f5]">
+                    {subordinados.map((s) => {
+                      const iniciales = `${s.nombre.charAt(0)}${s.apellidos.charAt(0)}`.toUpperCase();
+                      return (
+                        <li key={s.id} className="flex items-center gap-3 py-3">
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#203D47] to-[#0F1819] flex items-center justify-center text-white text-xs font-bold shrink-0">
+                            {iniciales}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-[#0F1819] truncate">
+                              {s.nombre} {s.apellidos}
+                            </p>
+                            <p className="text-xs text-[#8aa3ad] truncate">
+                              {s.cargo}
+                              {s.departamento ? ` · ${s.departamento}` : ""}
+                            </p>
+                          </div>
+                          <a
+                            href={`/dashboard/empleados/${s.id}`}
+                            className="text-xs font-semibold text-emerald-600 hover:text-emerald-500 shrink-0"
+                          >
+                            Ver perfil →
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -478,8 +649,8 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                         <p className="break-words text-xs font-medium text-[#0F1819]">{emailLocal}</p>
                   </div>
                   <div>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">Tipo</p>
-                    <p className="text-xs font-medium text-[#0F1819]">{empleado.tipoEmpleo}</p>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">Tipo de contrato</p>
+                    <p className="text-xs font-medium text-[#0F1819]">{tipoEmpleoActual}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 pt-2">
@@ -493,8 +664,14 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
                   </div>
                 </div>
                 <div className="border-t border-[#f0f4f5] pt-2">
-                  <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">Ubicación</p>
-                  <p className="text-xs font-medium text-[#0F1819]">{empleado.ubicacion}</p>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8aa3ad]">Reporta a</p>
+                  <p className="text-xs font-medium text-[#0F1819]">
+                    {empleado.superiorEmpleadoNombre && empleado.cargoSuperiorNombre
+                      ? `${empleado.superiorEmpleadoNombre} — ${empleado.cargoSuperiorNombre}`
+                      : empleado.cargoSuperiorNombre
+                        ? empleado.cargoSuperiorNombre
+                        : "—"}
+                  </p>
                 </div>
               </div>
               </div>
@@ -515,7 +692,10 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
       <RegisterWorkChangeModal
         isOpen={modalCambioAbierto}
         onCerrar={() => setModalCambioAbierto(false)}
-        salarioActual={4_320_000}
+        salarioBaseCargo={empleado.salarioBaseCargo}
+        cargoActualNombre={empleado.cargo}
+        cargoSuperiorId={empleado.cargoSuperiorId}
+        cargoSuperiorNombre={empleado.cargoSuperiorNombre}
         onGuardar={async (datos) => {
           if (datos.tipo === "") return;
 
@@ -529,26 +709,77 @@ export default function EmployeeProfileCard({ empleado, onEstadoCambiado }: Prop
             return;
           }
 
-          // El backend exige `description` y `event_date`; armamos un texto
-          // resumen para los cambios salariales (que tienen porcentaje/signo).
+          // El backend exige `description` y `event_date`. Para aumentos
+          // salariales prefijamos el porcentaje y, si tenemos el salario base
+          // del cargo, también el monto estimado nuevo — todo en el texto del
+          // evento, porque el backend no tiene un campo estructurado de salario
+          // por empleado.
           let description = datos.justificacion.trim();
           if (datos.tipo === "cambio_salarial") {
-            const signo = datos.tipoCambioSalarial === "aumento" ? "+" : "-";
-            description = `[${signo}${datos.porcentajeAjuste}%] ${description}`;
+            const pct = parseFloat(datos.porcentajeAjuste) || 0;
+            const base = empleado.salarioBaseCargo ?? 0;
+            const nuevo = base > 0 ? Math.round(base * (1 + pct / 100)) : 0;
+            const montoTxt = nuevo > 0 ? ` ≈ COP ${nuevo.toLocaleString("es-CO")}` : "";
+            description = `[+${datos.porcentajeAjuste}%${montoTxt}] ${description}`;
           }
 
           try {
+            // 1) Registra el evento en career_history (trayectoria visible).
             await crearEventoCarrera({
               description,
               event_date: datos.fechaEfectiva,
               type: backendType,
               id_employee: empleado.rawId,
             });
+
+            // 2) Si el cambio implica un nuevo cargo, aplicamos el cambio REAL
+            //    vía updateEmployee. Casos:
+            //    - Transfer: cargo destino lo elige el admin (datos.nuevaPosicion).
+            //      Llega como string "POS-00012" (el `id` de Position en UI),
+            //      hay que parsear quitándole el prefijo.
+            //    - Promotion: cargo destino es SIEMPRE el cargo padre del actual
+            //      (empleado.cargoSuperiorId). El admin no lo elige; ya es number.
+            //    El backend además autogenera otro evento en career_history al
+            //    detectar el cambio de id_position (esperado, lo conversamos).
+            let cargoActualizado = false;
+            let nuevoIdPosition: number | null = null;
+            if (datos.tipo === "traslado" && datos.nuevaPosicion) {
+              const raw = datos.nuevaPosicion.startsWith("POS-")
+                ? datos.nuevaPosicion.slice(4)
+                : datos.nuevaPosicion;
+              const n = Number(raw);
+              if (!Number.isNaN(n) && n > 0 && n !== empleado.cargoId) {
+                nuevoIdPosition = n;
+              }
+            } else if (datos.tipo === "ascenso" && empleado.cargoSuperiorId) {
+              if (empleado.cargoSuperiorId !== empleado.cargoId) {
+                nuevoIdPosition = empleado.cargoSuperiorId;
+              }
+            }
+
+            if (nuevoIdPosition !== null) {
+              await actualizarEmpleado(empleado.rawId, {
+                id_employee: empleado.rawId,
+                status: statusToBackend(empleado.estado),
+                id_position: nuevoIdPosition,
+              });
+              cargoActualizado = true;
+            }
+
             setModalCambioAbierto(false);
             await fetchTrayectoria();
+            // Recarga el empleado en el page padre si hubo cambio estructural,
+            // para que cargo/departamento del header se actualicen sin F5.
+            if (cargoActualizado) {
+              await onEmpleadoActualizado?.();
+            }
             setToastMsg({
-              title: "Cambio laboral registrado",
-              message: "El evento se añadió a la trayectoria del empleado.",
+              title: cargoActualizado
+                ? "Cambio laboral aplicado"
+                : "Cambio laboral registrado",
+              message: cargoActualizado
+                ? "Se actualizó el cargo del empleado y se añadió el evento a la trayectoria."
+                : "El evento se añadió a la trayectoria del empleado.",
             });
             setToastVisible(true);
           } catch (err) {

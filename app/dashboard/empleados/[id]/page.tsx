@@ -26,10 +26,19 @@ export default function PaginaDetalleEmpleado() {
       .finally(() => setCargando(false));
   }, [id]);
 
-  const handleEstadoCambiado = async (nuevoEstado: EstadoEmpleado) => {
+  const handleEstadoCambiado = async (nuevoEstado: EstadoEmpleado, motivo: string) => {
     if (!empleado) return;
-    const actualizado = await cambiarEstadoEmpleado(empleado.id, nuevoEstado, "");
+    const actualizado = await cambiarEstadoEmpleado(empleado.id, nuevoEstado, motivo);
     setEmpleado(actualizado);
+  };
+
+  // Re-fetch del empleado tras un cambio estructural (traslado de cargo, etc.).
+  // `obtenerEmpleadoPorId` ya enriquece con position y area, así el header
+  // muestra el cargo nuevo sin necesidad de F5.
+  const recargarEmpleado = async () => {
+    if (!empleado) return;
+    const fresco = await obtenerEmpleadoPorId(empleado.id);
+    if (fresco) setEmpleado(fresco);
   };
 
   if (cargando) return <LoadingSpinner mensaje="Cargando perfil del empleado..." />;
@@ -48,6 +57,7 @@ export default function PaginaDetalleEmpleado() {
       <EmployeeProfileCard
         empleado={empleado}
         onEstadoCambiado={handleEstadoCambiado}
+        onEmpleadoActualizado={recargarEmpleado}
       />
     </div>
   );

@@ -65,3 +65,55 @@ export function hasAnyPosition(
   if (user.position == null) return false;
   return allowed.includes(user.position);
 }
+
+// ───────────── Helpers granulares por feature ─────────────
+//
+// La idea: cada feature tiene una sola función que decide si el usuario puede
+// verla/usarla. Los componentes consumen estas funciones (no chequean
+// `isAdmin`/`position` a mano), así si el backend cambia las reglas solo se
+// actualiza acá. La lógica refleja lo que cada endpoint del backend acepta —
+// ver guards en gateway/src/.
+
+type PermissionCheck = (user: Pick<AuthUserContext, "isAdmin" | "position"> | null) => boolean;
+
+const isAdminOnly: PermissionCheck = (u) => !!u?.isAdmin;
+
+const isAdminOrHt: PermissionCheck = (u) =>
+  !!u && (u.isAdmin || isHumanTalent(u.position));
+
+const anyAuthenticated: PermissionCheck = (u) => u != null;
+
+/** Acceso al módulo Administradores (crear, listar, bloquear admins). */
+export const canManageAdmins = isAdminOnly;
+
+/** Acceso al CRUD de áreas / cargos. Backend: @Positions(HT_Lead, HT_Asst) + admin bypass. */
+export const canManageOrgStructure = isAdminOrHt;
+
+/** Acceso al CRUD de contratos. Mismo guard que estructura organizacional. */
+export const canManageContracts = isAdminOrHt;
+
+/** Acceso a invitar / editar empleados (a nivel HT). */
+export const canManageEmployees = isAdminOrHt;
+
+/** Ver el directorio completo de empleados (no solo el propio perfil). */
+export const canSeeEmployeesDirectory = isAdminOrHt;
+
+/** Generar reportes de desempeño y por área. Backend: @Positions(HT) + admin bypass. */
+export const canGenerateReports = isAdminOrHt;
+
+/** Crear evaluaciones de desempeño. Backend: cualquiera autenticado (pero
+ *  semánticamente quien evalúa es el manager/HT). En la UI lo dejamos para
+ *  HT/Admin para no confundir; un empleado regular no tiene una sección
+ *  para "evaluar a otros". */
+export const canCreateEvaluations = isAdminOrHt;
+
+/** Acceso al escaneo de QR (kiosco de check-in). Backend: público
+ *  (OptionalAuthGuard), pero solo tiene sentido para HT/Admin desde un
+ *  terminal de control. */
+export const canScanQr = isAdminOrHt;
+
+/** Ver el dashboard principal con stats agregadas. */
+export const canSeeDashboard = anyAuthenticated;
+
+/** Ver el organigrama (positions-tree). Backend: público. */
+export const canSeeOrgChart = anyAuthenticated;

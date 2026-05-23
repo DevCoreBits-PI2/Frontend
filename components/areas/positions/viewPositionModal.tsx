@@ -154,8 +154,23 @@ export default function ViewPositionModal({
           />
           <FilaDetalle
             icono={Hash}
-            etiqueta="Vacantes"
+            etiqueta="Vacantes definidas"
             valor={position.vacancies}
+          />
+          <FilaDetalle
+            icono={Users}
+            etiqueta="Empleados asignados"
+            valor={position.empleados.length}
+          />
+          <FilaDetalle
+            icono={Hash}
+            etiqueta="Cupos disponibles"
+            valor={(() => {
+              const disponibles = position.vacancies - position.empleados.length;
+              if (disponibles > 0) return disponibles;
+              if (disponibles === 0) return "0 (cargo lleno)";
+              return `0 (sobreasignado en ${Math.abs(disponibles)})`;
+            })()}
           />
           {position.baseSalary != null && (
             <FilaDetalle

@@ -65,11 +65,12 @@ const [estadisticas, setEstadisticas] = useState<EstadisticaDashboard | null>(nu
         {!cargando && !error && estadisticas && (
           <>
             <div className="mb-6 grid gap-4 md:grid-cols-3">
+              {/* Las variaciones porcentuales se quitaron: no hay cómputo
+                  real de "vs mes anterior", así que mostrar "+0%" mentía. */}
               <StatsCard
                 icono={Users}
                 etiqueta="Personal Activo"
                 valor={estadisticas.personalActivo}
-                variacion={estadisticas.variacionPersonalActivo}
               />
               <StatsCard
                 icono={PauseCircle}
@@ -81,7 +82,6 @@ const [estadisticas, setEstadisticas] = useState<EstadisticaDashboard | null>(nu
                 icono={PersonStanding}
                 etiqueta="Retirados (año actual)"
                 valor={estadisticas.retiradosYTD}
-                variacion={estadisticas.variacionRetirados}
               />
             </div>
 

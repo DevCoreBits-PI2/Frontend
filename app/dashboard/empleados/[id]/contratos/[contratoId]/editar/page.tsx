@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronRight, Lock, CheckCircle2, Info } from "lucide-react";
+import { ChevronRight, Lock, CheckCircle2, Info, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { Empleado, obtenerEmpleadoPorId } from "@/services/empleadosService";
@@ -16,11 +16,11 @@ import {
   obtenerContratoPorId,
   validarContrato,
 } from "@/services/contratosService";
-import ContractTypeSelect from "@/components/contratos/ContractTypeSelect";
 
 const VALIDACION_INICIAL: ResultadoValidacion = {
   rangoFechasValido: true,
   sinSolapamiento: true,
+  duracionValida: true,
 };
 
 function formatIsoToDisplay(iso: string | null): string {
@@ -47,6 +47,7 @@ function ValidationCard({ resultado }: { resultado: ResultadoValidacion }) {
   const items = [
     { label: "Rango de fechas válido", ok: resultado.rangoFechasValido },
     { label: "Sin solapamiento con otros contratos activos", ok: resultado.sinSolapamiento },
+    { label: "Duración legal del tipo", ok: resultado.duracionValida },
   ];
 
   const allValid = items.every((i) => i.ok);
@@ -76,6 +77,12 @@ function ValidationCard({ resultado }: { resultado: ResultadoValidacion }) {
         ))}
       </div>
 
+      {!resultado.duracionValida && resultado.mensajeDuracion && (
+        <p className="text-xs text-rose-600 leading-relaxed">
+          {resultado.mensajeDuracion}
+        </p>
+      )}
+
       <p className="text-xs text-[#8aa3ad] leading-relaxed border-t border-[#f0f4f5] pt-3">
         {allValid
           ? "Todas las condiciones del contrato cumplen las validaciones. Listo para guardar."
@@ -95,6 +102,10 @@ export default function PaginaEditarContrato() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // El tipo de contrato NO se edita acá. Cambiar entre FIJO e INDEFINIDO
+  // implica un acuerdo legal distinto: el flujo correcto es anular y crear
+  // uno nuevo. El valor solo se usa para mostrar y para condicionar la UI
+  // de fecha fin (que sigue siendo editable cuando es FIJO).
   const [tipo, setTipo] = useState<TipoContrato>("FIJO");
   const [fechaFin, setFechaFin] = useState("");
   const [notas, setNotas] = useState("");
@@ -119,21 +130,53 @@ export default function PaginaEditarContrato() {
       .finally(() => setCargando(false));
   }, [empleadoId, contratoId]);
 
-  // Si el tipo cambia a INDEFINIDO, limpiamos la fecha de fin.
-  useEffect(() => {
-    if (tipo === "INDEFINIDO") setFechaFin("");
-  }, [tipo]);
+  // Ya no permitimos cambiar el tipo desde acá, así que el efecto que limpiaba
+  // la fecha al cambiar a INDEFINIDO sobra. Mantengo la variable `tipo` como
+  // read-only del estado inicial.
 
   useEffect(() => {
     if (!contrato) return;
     const fechaFinReal = tipo === "INDEFINIDO" ? null : (fechaFin || null);
-    validarContrato(empleadoId, contrato.fechaInicio, fechaFinReal, contratoId).then(setValidacion);
+    validarContrato(empleadoId, contrato.fechaInicio, fechaFinReal, contratoId, tipo).then(setValidacion);
   }, [empleadoId, contrato, contratoId, fechaFin, tipo]);
 
+  // El backend solo permite editar contratos en estado `valid` (ACTIVO en la
+  // UI). Si el contrato está EXPIRADO, RENOVADO o ANULADO, el PATCH al backend
+  // rebota con 400. Lo bloqueamos en frontend para no permitir intentos.
+  // Además, los INDEFINIDO no se editan desde acá porque cualquier cambio real
+  // (condiciones, PDF, etc.) implica un nuevo contrato firmado.
+  const esEditable =
+    contrato?.estado === "ACTIVO" && contrato?.tipo !== "INDEFINIDO";
+
   const formularioValido = useMemo(() => {
+    if (!esEditable) return false;
     if (tipo !== "INDEFINIDO" && !fechaFin) return false;
-    return validacion.rangoFechasValido && validacion.sinSolapamiento;
-  }, [tipo, fechaFin, validacion]);
+    return (
+      validacion.rangoFechasValido &&
+      validacion.sinSolapamiento &&
+      validacion.duracionValida
+    );
+  }, [esEditable, tipo, fechaFin, validacion]);
+
+  // Texto explicativo según el motivo de bloqueo, para que el admin sepa por qué.
+  const motivoBloqueo: string | null = (() => {
+    if (!contrato || esEditable) return null;
+    // El bloqueo por tipo INDEFINIDO gana sobre el bloqueo por estado: un
+    // indefinido ACTIVO igual no se debería editar acá.
+    if (contrato.estado === "ACTIVO" && contrato.tipo === "INDEFINIDO") {
+      return "Los contratos indefinidos no se editan desde acá. Cualquier cambio en las condiciones requiere anular este contrato y crear uno nuevo, para mantener trazabilidad legal.";
+    }
+    switch (contrato.estado) {
+      case "EXPIRADO":
+        return "El contrato ya expiró. No se permite modificarlo; podés renovarlo o crear uno nuevo.";
+      case "RENOVADO":
+        return "Este contrato fue renovado y forma parte del historial laboral. Edita el contrato renovado vigente o crea uno nuevo.";
+      case "ANULADO":
+        return "Este contrato fue anulado. No se permite modificarlo; crea uno nuevo si la relación laboral continúa.";
+      default:
+        return "Este contrato no se encuentra en estado editable.";
+    }
+  })();
 
   const handleGuardar = async () => {
     if (!formularioValido || guardando) return;
@@ -144,10 +187,21 @@ export default function PaginaEditarContrato() {
         notas,
         tipo,
       });
-      toast.success("Contrato actualizado.");
+      // El toast de "Contrato actualizado" lo dispara la página destino al
+      // detectar `?actualizado=1`. Si lo mostrábamos también acá quedaba
+      // duplicado (dos toasts apilados con el mismo mensaje).
       router.push(`/dashboard/empleados/${empleadoId}/contratos?actualizado=1`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "No se pudo actualizar el contrato.";
+      const rawMsg = err instanceof Error ? err.message : "";
+      const lower = rawMsg.toLowerCase();
+      let msg = rawMsg || "No se pudo actualizar el contrato.";
+      if (lower.includes("already has an active contract") || lower.includes("overlapping")) {
+        msg = "Las nuevas fechas se solapan con otro contrato activo del empleado. Ajusta las fechas para que no se crucen.";
+      } else if (lower.includes("end date must be after start date")) {
+        msg = "La fecha de fin debe ser posterior a la de inicio.";
+      } else if (lower.includes("cannot be modified")) {
+        msg = "Este contrato ya no se puede modificar (está expirado, renovado o anulado).";
+      }
       toast.error(msg);
     } finally {
       setGuardando(false);
@@ -203,6 +257,7 @@ export default function PaginaEditarContrato() {
               type="button"
               onClick={handleGuardar}
               disabled={!formularioValido || guardando}
+              title={!esEditable ? motivoBloqueo ?? undefined : undefined}
               className="rounded-lg bg-[#2ECC71] px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {guardando ? "Guardando..." : "Guardar Cambios"}
@@ -210,14 +265,28 @@ export default function PaginaEditarContrato() {
           </div>
         </div>
 
-        {contrato.estado === "ACTIVO" && (
+        {esEditable ? (
           <div className="mb-6 flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3.5">
             <Info size={16} className="mt-0.5 shrink-0 text-sky-500" />
             <div>
-              <p className="text-sm font-semibold text-sky-700">Contrato Activo</p>
+              <p className="text-sm font-semibold text-sky-700">Contrato fijo activo — alcance acotado</p>
               <p className="text-xs text-sky-600">
-                Estás editando un contrato activo. Los cambios se reflejan inmediatamente.
+                Acá solo podés ajustar la <strong>fecha de fin</strong> y las <strong>notas</strong>.
+                Para cambiar el tipo, las condiciones estructurales o el PDF, anula este
+                contrato y crea uno nuevo desde el módulo de contratos.
               </p>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-500" />
+            <div>
+              <p className="text-sm font-semibold text-amber-700">
+                {contrato.estado === "ACTIVO" && contrato.tipo === "INDEFINIDO"
+                  ? "Contrato indefinido — no editable"
+                  : `Contrato ${contrato.estado.toLowerCase()} — no editable`}
+              </p>
+              <p className="text-xs text-amber-700/90">{motivoBloqueo}</p>
             </div>
           </div>
         )}
@@ -229,7 +298,10 @@ export default function PaginaEditarContrato() {
             <div className="grid grid-cols-2 gap-x-5 gap-y-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-[#576975]">Tipo de Contrato</label>
-                <ContractTypeSelect valor={tipo} onChange={setTipo} />
+                <LockedInput value={TIPO_CONTRATO_LABEL[tipo]} />
+                <span className="text-[11px] text-[#8aa3ad]">
+                  El tipo de contrato no se puede modificar. Para cambiarlo, anula este contrato y crea uno nuevo.
+                </span>
               </div>
 
               <div className="flex flex-col gap-1.5">
@@ -251,7 +323,8 @@ export default function PaginaEditarContrato() {
                     type="date"
                     value={fechaFin}
                     onChange={(e) => setFechaFin(e.target.value)}
-                    className="w-full rounded-lg border border-[#d1dde2] bg-white px-3.5 py-2.5 text-sm text-[#0F1819] outline-none transition focus:border-[#2ECC71] focus:ring-2 focus:ring-[#2ECC71]/20"
+                    disabled={!esEditable}
+                    className="w-full rounded-lg border border-[#d1dde2] bg-white px-3.5 py-2.5 text-sm text-[#0F1819] outline-none transition focus:border-[#2ECC71] focus:ring-2 focus:ring-[#2ECC71]/20 disabled:cursor-not-allowed disabled:bg-[#f8fafb] disabled:text-[#8aa3ad]"
                   />
                 )}
               </div>
@@ -263,8 +336,9 @@ export default function PaginaEditarContrato() {
                 value={notas}
                 onChange={(e) => setNotas(e.target.value)}
                 rows={4}
+                disabled={!esEditable}
                 placeholder="Añade cualquier nota o condición adicional..."
-                className="w-full resize-none rounded-lg border border-[#d1dde2] bg-white px-3.5 py-2.5 text-sm text-[#0F1819] outline-none transition focus:border-[#2ECC71] focus:ring-2 focus:ring-[#2ECC71]/20 placeholder:text-[#c5d5db]"
+                className="w-full resize-none rounded-lg border border-[#d1dde2] bg-white px-3.5 py-2.5 text-sm text-[#0F1819] outline-none transition focus:border-[#2ECC71] focus:ring-2 focus:ring-[#2ECC71]/20 placeholder:text-[#c5d5db] disabled:cursor-not-allowed disabled:bg-[#f8fafb] disabled:text-[#8aa3ad]"
               />
               <span className="text-[11px] text-[#8aa3ad]">
                 Tipo actual: <strong>{TIPO_CONTRATO_LABEL[tipo]}</strong>

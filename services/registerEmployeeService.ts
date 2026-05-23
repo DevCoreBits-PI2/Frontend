@@ -5,16 +5,23 @@
 // contrato exacto del backend y reportamos errores de manera homogénea.
 
 import { ApiError, apiGet, apiPost } from "@/lib/api/client";
-import { EMPLOYEES } from "@/lib/api/endpoints";
+import { EMPLOYEES, POSITIONS } from "@/lib/api/endpoints";
 import { normalizePaginated } from "@/types/api/common";
 import { obtenerAreas } from "./areasService";
 import { obtenerPosiciones } from "./positionsService";
+import { findEmpleadoEnCargo } from "./orgLookupService";
 import type { EmployeeDto, InviteUserPayload } from "@/types/api/employee";
+import type { PositionDto } from "@/types/api/position";
 
 export interface Position {
   id: string;
   nombre: string;
   areaId: string;
+  /** Cupos definidos en `positions.vacancies` */
+  vacancies: number;
+  /** Empleados ya asignados a este cargo (calculado en frontend vía
+   *  enrichPositionsWithEmployees, porque el backend no lo expone aparte). */
+  empleadosAsignados: number;
 }
 
 export const DOCUMENT_TYPES = [
@@ -44,6 +51,8 @@ export async function obtenerPosicionesParaRegistro(): Promise<Position[]> {
     id: String(p.rawId),
     nombre: p.nombre,
     areaId: String(p.areaIdNumber),
+    vacancies: p.vacancies,
+    empleadosAsignados: p.empleados.length,
   }));
 }
 
@@ -148,6 +157,29 @@ export const enviarRegistroEmpleado = async (
     };
   }
 
+  // Auto-resolución de `id_manager` cuando el caller no lo pasó explícito.
+  // Lógica A4: el "jefe" estructural de un empleado nuevo es el ocupante del
+  // cargo padre del cargo que va a ocupar. Así `getSubordinates` del backend
+  // (que filtra por id_manager) sigue funcionando para futuros consumidores,
+  // sin que el invitador tenga que elegir manager a mano.
+  let resolvedManagerId: number | null = payload.managerId ?? null;
+  if (resolvedManagerId == null) {
+    try {
+      const positionDto = await apiGet<PositionDto>(
+        POSITIONS.findOne(Number(payload.positionId)),
+      );
+      const parentId = positionDto?.parent_position_id ?? null;
+      if (typeof parentId === "number" && parentId > 0) {
+        const ocupante = await findEmpleadoEnCargo(parentId);
+        if (ocupante?.id) resolvedManagerId = ocupante.id;
+      }
+    } catch {
+      // Si falla la resolución del cargo padre, dejamos `id_manager: null`
+      // (el backend lo acepta) y seguimos. El "Equipo Directo" en el perfil
+      // ya no depende de este campo, así que no es bloqueante.
+    }
+  }
+
   const body: InviteUserPayload = {
     email: payload.email,
     first_name,
@@ -156,7 +188,7 @@ export const enviarRegistroEmpleado = async (
     code: documento,
     status: "invited",
     id_position: Number(payload.positionId),
-    id_manager: payload.managerId ?? null,
+    id_manager: resolvedManagerId,
     id_administrator: payload.idAdministrator,
   };
 

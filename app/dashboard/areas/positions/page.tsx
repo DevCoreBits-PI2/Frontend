@@ -25,8 +25,10 @@ import {
   type Position,
   type NuevaPosicionInput,
 } from "@/services/positionsService";
+import { translateBackendError } from "@/lib/api/translateError";
 import { obtenerAreas, type Area } from "@/services/areasService";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { canManageHumanTalent } from "@/lib/auth/roles";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES & INTERFACES
@@ -170,12 +172,23 @@ function NewPositionModal({
 
   const handleSave = async () => {
     setError("");
-    if (!nombre.trim()) {
+    // Validaciones alineadas con el backend (`normalizeName` exige 3-100).
+    const n = nombre.trim();
+    if (!n) {
       setError("El nombre es obligatorio.");
       return;
     }
-    if (!descripcion.trim()) {
+    if (n.length < 3 || n.length > 100) {
+      setError("El nombre debe tener entre 3 y 100 caracteres.");
+      return;
+    }
+    const d = descripcion.trim();
+    if (!d) {
       setError("La descripción es obligatoria.");
+      return;
+    }
+    if (d.length < 3 || d.length > 500) {
+      setError("La descripción debe tener entre 3 y 500 caracteres.");
       return;
     }
     if (!areaIdNum) {
@@ -260,11 +273,13 @@ function NewPositionModal({
               className="w-full px-3 py-2 border border-[#BDD5EA] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-[#0F1819]"
             >
               <option value="">(Sin posición superior)</option>
-              {parentOptions.map((p) => (
-                <option key={p.id} value={String(p.rawId)}>
-                  {p.nombre} — {p.areaNombre || "sin área"}
-                </option>
-              ))}
+              {parentOptions
+                .filter((p) => p.estado === "Active")
+                .map((p) => (
+                  <option key={p.id} value={String(p.rawId)}>
+                    {p.nombre} — {p.areaNombre || "sin área"}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -351,6 +366,7 @@ function NewPositionModal({
 
 export default function PositionsPage() {
   const { authUser } = useAuth();
+  const puedeGestionar = authUser ? canManageHumanTalent(authUser) : false;
   const [posicionAVer, setPosicionAVer] = useState<Position | null>(null); //Nuevos estados
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null); //Nuevos estados
   const [positions, setPositions] = useState<Position[]>([]);
@@ -459,7 +475,8 @@ export default function PositionsPage() {
       });
       await Promise.all([fetchPositions(), fetchTodasLasPosiciones()]);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "No se pudo crear la posición";
+      const raw = error instanceof Error ? error.message : "";
+      const msg = translateBackendError(raw) || "No se pudo crear la posición";
       console.error("Error creating position:", error);
       setToast({ title: "Error", message: msg });
     } finally {
@@ -513,13 +530,15 @@ return (
             <h1 className="text-2xl font-bold text-[#0F1819]">
               Gestión de Posiciones
             </h1>
-            <button
-              onClick={() => setShowNewModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              Nueva Posición
-            </button>
+            {puedeGestionar && (
+              <button
+                onClick={() => setShowNewModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                Nueva Posición
+              </button>
+            )}
           </div>
         </div>
       </div>

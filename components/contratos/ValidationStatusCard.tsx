@@ -15,13 +15,24 @@ export default function ValidationStatusCard({
   const items = [
     {
       titulo: "Rango de Fechas Válido",
-      descripcion: "La fecha de fin debe ser posterior a la de inicio (o no aplicar si es indefinido).",
+      descripcion: resultado.rangoFechasValido
+        ? "La fecha de fin es posterior a la de inicio (o no aplica para indefinidos)."
+        : "La fecha de fin debe ser posterior a la de inicio.",
       ok: resultado.rangoFechasValido,
     },
     {
       titulo: "Sin Contratos Solapados",
-      descripcion: `${nombreEmpleado} no tiene otros contratos activos durante este período.`,
+      descripcion: resultado.sinSolapamiento
+        ? `${nombreEmpleado} no tiene otros contratos activos durante este período.`
+        : `${nombreEmpleado} ya tiene un contrato activo que se solapa con estas fechas. Anula el vigente o ajusta las fechas para que no se crucen.`,
       ok: resultado.sinSolapamiento,
+    },
+    {
+      titulo: "Duración Legal del Tipo",
+      descripcion:
+        resultado.mensajeDuracion ??
+        "La duración del contrato cumple con las reglas legales para el tipo seleccionado.",
+      ok: resultado.duracionValida,
     },
   ];
 

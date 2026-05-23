@@ -32,6 +32,9 @@ export interface EmployeeDto {
     id_position?: number;
     name: string;
     id_area?: number;
+    base_salary?: number | null;
+    parent_position_id?: number | null;
+    parent_position?: { id_position?: number; id?: number; name?: string } | null;
     area?: { id: number; name: string };
   };
   area?: { id: number; name: string };

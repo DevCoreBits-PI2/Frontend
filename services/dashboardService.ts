@@ -90,8 +90,26 @@ function diasHasta(fecha: string): number {
 
 export async function obtenerAlertasContratos(): Promise<AlertaContrato[]> {
   return tryFetch(async () => {
-    const raw = await apiGet<unknown>(CONTRACTS.findAll, { query: { limit: 100 } });
-    const contratos = normalizePaginated<ContractDto>(raw);
+    // Igual que en el resto del frontend: el backend pagina con limit=10 por
+    // defecto. Pedimos 1000 para asegurar contar todas las alertas.
+    const [contratosRaw, empleadosRaw] = await Promise.all([
+      apiGet<unknown>(CONTRACTS.findAll, { query: { limit: 1000 } }),
+      // Cargamos empleados en paralelo para resolver el `departamento` que el
+      // backend de contracts no devuelve. Si el rol no tiene permiso para
+      // findAll de empleados, queda en "" igual que antes (degradación graceful).
+      apiGet<unknown>(EMPLOYEES.findAll, { query: { limit: 1000 } }).catch(() => null),
+    ]);
+
+    const contratos = normalizePaginated<ContractDto>(contratosRaw);
+    const empleados = empleadosRaw ? normalizePaginated<EmployeeDto>(empleadosRaw) : [];
+
+    // Map id_employee → nombre del área del cargo (si lo conocemos).
+    const areaByEmployee = new Map<number, string>();
+    for (const e of empleados) {
+      const id = e.id ?? e.id_employee;
+      const areaName = e.position?.area?.name;
+      if (typeof id === "number" && areaName) areaByEmployee.set(id, areaName);
+    }
 
     return contratos
       .filter((c) => c.end_date && (c.contract_status ?? c.status) !== "expired")
@@ -105,7 +123,7 @@ export async function obtenerAlertasContratos(): Promise<AlertaContrato[]> {
           idContrato: c.id ?? c.id_contract ?? 0,
           nombre: employeeName,
           codigoContrato: `CN-${String(c.id ?? c.id_contract ?? 0).padStart(4, "0")}`,
-          departamento: "",
+          departamento: areaByEmployee.get(c.id_employee) ?? "",
           diasRestantes: dias,
           condiciones: c.conditions,
           tipo: c.contract_type,
@@ -121,19 +139,36 @@ export async function obtenerAlertasContratos(): Promise<AlertaContrato[]> {
 
 export async function obtenerJerarquiaDepartamental(): Promise<NodoOrg[]> {
   return tryFetch(async () => {
-    const raw = await apiGet<unknown>(AREAS.findAll, { query: { limit: 100 } });
-    const areas = normalizePaginated<AreaDto>(raw);
+    // `_count.positions` cuenta los cargos del área (estructura), no los
+    // empleados ocupando esos cargos. Para tener "miembros reales" cargamos
+    // también el findAll de empleados y agrupamos por área.
+    const [areasRaw, empleadosRaw] = await Promise.all([
+      apiGet<unknown>(AREAS.findAll, { query: { limit: 1000 } }),
+      apiGet<unknown>(EMPLOYEES.findAll, { query: { limit: 1000 } }).catch(() => null),
+    ]);
+
+    const areas = normalizePaginated<AreaDto>(areasRaw);
+    const empleados = empleadosRaw ? normalizePaginated<EmployeeDto>(empleadosRaw) : [];
+
+    // empleados por área (usando position.area.id o position.id_area).
+    const empleadosPorArea = new Map<number, number>();
+    for (const e of empleados) {
+      const areaId = e.position?.area?.id ?? e.position?.id_area;
+      if (typeof areaId === "number") {
+        empleadosPorArea.set(areaId, (empleadosPorArea.get(areaId) ?? 0) + 1);
+      }
+    }
 
     return areas.map<NodoOrg>((a) => ({
       id: String(a.id),
       nombre: a.name,
       nivel: "GESTION",
       estado: a.status === "active" ? "ACTIVO" : "INACTIVO",
-      cantidadMiembros: a._count?.positions ?? a.positions_count ?? 0,
+      cantidadMiembros: empleadosPorArea.get(Number(a.id)) ?? 0,
       idPadre: null,
       descripcion: a.description,
       avatares: [],
-      vacantes: 0,
+      vacantes: a._count?.positions ?? a.positions_count ?? 0,
       utilizacionPresupuesto: 0,
       retencion: 0,
       lideres: [],

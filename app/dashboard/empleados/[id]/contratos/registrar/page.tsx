@@ -23,6 +23,7 @@ import AdditionalInformationCard from "@/components/contratos/AdditionalInformat
 const VALIDACION_INICIAL: ResultadoValidacion = {
   rangoFechasValido: true,
   sinSolapamiento: true,
+  duracionValida: true,
 };
 
 function fechaIsoHoy(): string {
@@ -72,13 +73,17 @@ export default function PaginaRegistrarContrato() {
   // Validacion en vivo cada vez que cambian los datos relevantes
   useEffect(() => {
     const fechaFinReal = tipo === "INDEFINIDO" ? null : fechaFin;
-    validarContrato(empleadoId, fechaInicio, fechaFinReal).then(setValidacion);
+    validarContrato(empleadoId, fechaInicio, fechaFinReal, undefined, tipo).then(setValidacion);
   }, [empleadoId, tipo, fechaInicio, fechaFin]);
 
   const formularioValido = useMemo(() => {
     if (!fechaInicio) return false;
     if (tipo !== "INDEFINIDO" && !fechaFin) return false;
-    return validacion.rangoFechasValido && validacion.sinSolapamiento;
+    return (
+      validacion.rangoFechasValido &&
+      validacion.sinSolapamiento &&
+      validacion.duracionValida
+    );
   }, [fechaInicio, fechaFin, tipo, validacion]);
 
   const handleGuardar = async () => {
@@ -107,10 +112,22 @@ export default function PaginaRegistrarContrato() {
         notas,
         archivoPdf: documento,
       });
-      toast.success("Contrato registrado.");
+      // El toast de éxito ("Contrato creado con éxito") lo dispara la página
+      // destino al detectar `?creado=1`. No lo mostramos acá para evitar el
+      // duplicado visual (dos toasts apilados).
       router.push(`/dashboard/empleados/${empleadoId}/contratos?creado=1`);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "No se pudo registrar el contrato.";
+      // Traducimos mensajes técnicos del backend a español user-friendly.
+      const rawMsg = e instanceof Error ? e.message : "";
+      const lower = rawMsg.toLowerCase();
+      let msg = rawMsg || "No se pudo registrar el contrato.";
+      if (lower.includes("already has an active contract") || lower.includes("overlapping")) {
+        msg = "Este empleado ya tiene un contrato activo que se solapa con las fechas elegidas. Anula el contrato vigente o ajusta las fechas para que no se crucen.";
+      } else if (lower.includes("end date must be after start date")) {
+        msg = "La fecha de fin debe ser posterior a la de inicio.";
+      } else if (lower.includes("end date is required")) {
+        msg = "Este tipo de contrato requiere una fecha de fin.";
+      }
       toast.error(msg);
     } finally {
       setGuardando(false);

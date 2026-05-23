@@ -203,10 +203,56 @@ export const obtenerPosiciones = async (
   // y los avatares correctos, hacemos un fetch adicional de todos los empleados
   // y agrupamos por id_position. Si el endpoint falla (p.ej. 403 por permisos),
   // degradamos a la lista sin empleados.
-  await enrichPositionsWithEmployees(items);
+  // En paralelo, resolvemos los nombres de los cargos padres (que vienen como
+  // id pero no como nombre).
+  await Promise.all([
+    enrichPositionsWithEmployees(items),
+    enrichPositionsWithParentName(items),
+  ]);
 
   return { data: items, total, page, pageSize };
 };
+
+// `findOnePosition` y `findAllPositions` del backend NO incluyen `parent_position`
+// (Prisma sin `include`). Solo viene `parent_position_id`. Para mostrar el
+// nombre del cargo superior en el modal/tabla, traemos el árbol completo
+// (un solo fetch) y resolvemos id → name en memoria.
+async function enrichPositionsWithParentName(items: Position[]): Promise<void> {
+  const parentIds = new Set<number>();
+  for (const p of items) {
+    if (typeof p.posicionSuperiorId === "number" && !p.posicionSuperior) {
+      parentIds.add(p.posicionSuperiorId);
+    }
+  }
+  if (parentIds.size === 0) return;
+
+  try {
+    const raw = await apiGet<unknown>(POSITIONS.tree);
+    const tree: PositionTreeNode[] = Array.isArray(raw)
+      ? (raw as PositionTreeNode[])
+      : Array.isArray((raw as { data?: unknown })?.data)
+        ? ((raw as { data: PositionTreeNode[] }).data)
+        : [];
+
+    const nameById = new Map<number, string>();
+    const stack = [...tree];
+    while (stack.length) {
+      const node = stack.pop();
+      if (!node) continue;
+      const id = node.id ?? node.id_position;
+      if (typeof id === "number" && node.name) nameById.set(id, node.name);
+      if (node.children?.length) stack.push(...node.children);
+    }
+
+    for (const p of items) {
+      if (typeof p.posicionSuperiorId === "number" && !p.posicionSuperior) {
+        p.posicionSuperior = nameById.get(p.posicionSuperiorId) ?? null;
+      }
+    }
+  } catch {
+    // best-effort: si falla el fetch del árbol, dejamos lo que vino del backend.
+  }
+}
 
 async function enrichPositionsWithEmployees(items: Position[]): Promise<void> {
   if (items.length === 0) return;
@@ -252,9 +298,12 @@ export const obtenerPosicionPorId = async (id: number | string): Promise<Positio
   const dto = await apiGet<PositionDto>(POSITIONS.findOne(realId));
   const position = dtoToPosition(dto);
   // Mismo enriquecimiento que `obtenerPosiciones`: el backend `findOnePosition`
-  // tampoco hace include de employees, así que la vista de detalle quedaba con
-  // empleados vacíos. Hacemos el lookup adicional acá también.
-  await enrichPositionsWithEmployees([position]);
+  // tampoco hace include de employees ni de parent_position. Resolvemos
+  // ambas cosas en client-side para que el modal de detalle muestre todo bien.
+  await Promise.all([
+    enrichPositionsWithEmployees([position]),
+    enrichPositionsWithParentName([position]),
+  ]);
   return position;
 };
 

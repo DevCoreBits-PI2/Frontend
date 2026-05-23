@@ -4,8 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Search, FileText, MapPin, ClipboardList } from "lucide-react";
 import { Empleado, obtenerEmpleados } from "@/services/empleadosService";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { canManageHumanTalent } from "@/lib/auth/roles";
 
 export default function PaginaDirectorioEmpleados() {
+  const { authUser } = useAuth();
+  const puedeCrear = authUser ? canManageHumanTalent(authUser) : false;
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -49,14 +53,16 @@ export default function PaginaDirectorioEmpleados() {
               Consulta el personal activo y gestiona sus contratos.
             </p>
           </div>
-          <div className="flex items-center justify-end mb-6">
-            <Link
-              href="/dashboard/empleados/register"
-              className="inline-flex items-center gap-2 bg-[#2ECC71] hover:opacity-90 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-opacity"
-            >
-              Crear Empleado
-            </Link>
-          </div>
+          {puedeCrear && (
+            <div className="flex items-center justify-end mb-6">
+              <Link
+                href="/dashboard/empleados/register"
+                className="inline-flex items-center gap-2 bg-[#2ECC71] hover:opacity-90 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-opacity"
+              >
+                Crear Empleado
+              </Link>
+            </div>
+          )}
         </div>
 
         { /* Botón de creación de empleado */}

@@ -11,6 +11,7 @@ import ChangePasswordModal from './ChangePasswordModal';
 import ToastNotification from '@/components/ToastNotification';
 import { cambiarPasswordUsuario } from '@/services/passwordService';
 import { generarQrEmpleado } from '@/services/qrService';
+import { obtenerSubordinadosPorJerarquia, type Empleado } from '@/services/empleadosService';
 import QRCode from 'qrcode';
 
 interface UserProfileCardProps {
@@ -96,7 +97,9 @@ export default function UserProfileCard({
   evaluacionesLoading,
   evaluacionesError,
 }: UserProfileCardProps) {
-  const [activeTab, setActiveTab] = useState<'trayectoria' | 'contratos' | 'desempeño'>('trayectoria');
+  const [activeTab, setActiveTab] = useState<'trayectoria' | 'contratos' | 'desempeño' | 'equipo'>('trayectoria');
+  const [subordinados, setSubordinados] = useState<Empleado[]>([]);
+  const [subordinadosLoading, setSubordinadosLoading] = useState(false);
   const estadoConfig = ESTADO_CONFIG[user.estado] ?? ESTADO_CONFIG.INACTIVO;
   const isActivo = user.estado === 'ACTIVO';
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -167,6 +170,31 @@ export default function UserProfileCard({
     generarQr();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, user.idFuncionario]);
+
+  // Carga el equipo directo del usuario por jerarquía de cargos
+  // (positions.parent_position_id). Solo aplica a empleados; los admins no
+  // tienen cargo en la tabla employees.
+  useEffect(() => {
+    if (isAdmin || !user.cargoId) {
+      setSubordinados([]);
+      return;
+    }
+    let cancelado = false;
+    setSubordinadosLoading(true);
+    obtenerSubordinadosPorJerarquia(user.cargoId)
+      .then((data) => {
+        if (cancelado) return;
+        // Filtramos al propio usuario por seguridad (caso borde de datos).
+        setSubordinados(data.filter((s) => s.rawId !== user.idFuncionario));
+      })
+      .catch(() => {
+        if (!cancelado) setSubordinados([]);
+      })
+      .finally(() => {
+        if (!cancelado) setSubordinadosLoading(false);
+      });
+    return () => { cancelado = true; };
+  }, [isAdmin, user.cargoId, user.idFuncionario]);
 
   // Renderizado local del QR: convertimos el token (JWT real del backend) en
   // una data URL usando la librería `qrcode`. El token nunca sale del navegador.
@@ -286,6 +314,11 @@ export default function UserProfileCard({
               { id: 'trayectoria', label: 'Trayectoria', icon: '◆' },
               { id: 'contratos',   label: 'Contratos',   icon: '□' },
               { id: 'desempeño',   label: 'Desempeño',   icon: '▽' },
+              // El tab "Equipo Directo" solo aparece para empleados con al
+              // menos un subordinado estructural (cargo hijo en la jerarquía).
+              ...(!isAdmin && subordinados.length > 0
+                ? [{ id: 'equipo', label: `Equipo Directo (${subordinados.length})`, icon: '◇' }]
+                : []),
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -406,6 +439,46 @@ export default function UserProfileCard({
                 error={evaluacionesError}
               />
             )}
+
+            {activeTab === 'equipo' && (
+              <div className="rounded-xl bg-white p-6 shadow-sm">
+                <div className="mb-4">
+                  <h2 className="text-lg font-bold text-jet-black-900">Equipo Directo</h2>
+                  <p className="mt-0.5 text-xs text-platinum-700">
+                    Empleados que ocupan cargos que reportan a tu cargo ({user.cargo}).
+                  </p>
+                </div>
+                {subordinadosLoading ? (
+                  <p className="py-6 text-center text-sm text-platinum-700">Cargando equipo...</p>
+                ) : subordinados.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-platinum-700">
+                    No tienes subordinados directos asignados a cargos hijos del tuyo.
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-platinum-200">
+                    {subordinados.map((s) => {
+                      const inicialesSub = `${s.nombre.charAt(0)}${s.apellidos.charAt(0)}`.toUpperCase();
+                      return (
+                        <li key={s.id} className="flex items-center gap-3 py-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#203D47] to-[#0F1819] text-xs font-bold text-white">
+                            {inicialesSub}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-jet-black-900">
+                              {s.nombre} {s.apellidos}
+                            </p>
+                            <p className="truncate text-xs text-platinum-700">
+                              {s.cargo}
+                              {s.departamento ? ` · ${s.departamento}` : ''}
+                            </p>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-6">
@@ -417,7 +490,7 @@ export default function UserProfileCard({
               />
             )}
 
-            {activeTab !== 'desempeño' && (
+            {activeTab !== 'desempeño' && activeTab !== 'equipo' && (
               <>
                 <div className="rounded-xl bg-white p-6 shadow-sm">
                   <div className="mb-6 flex items-center gap-2 border-b border-platinum-200 pb-4">

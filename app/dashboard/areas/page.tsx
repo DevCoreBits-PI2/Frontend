@@ -9,6 +9,8 @@ import DeleteAreaModal from "@/components/areas/DeleteAreaModal";
 import ToastNotification from "@/components/ToastNotification";
 import ViewAreaModal from "@/components/areas/ViewAreaModal";
 import { ChevronRight, Plus } from "lucide-react";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { canManageHumanTalent } from "@/lib/auth/roles";
 
 interface ToastInfo {
   title: string;
@@ -16,6 +18,8 @@ interface ToastInfo {
 }
 
 export default function PaginaAreas() {
+  const { authUser } = useAuth();
+  const puedeGestionar = authUser ? canManageHumanTalent(authUser) : false;
   const [areas, setAreas] = useState<Area[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,13 +72,15 @@ export default function PaginaAreas() {
               Define y administra los departamentos y unidades de negocio de la organizacion.
             </p>
           </div>
-          <button
-            onClick={() => setMostrarCrear(true)}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shrink-0"
-          >
-            <Plus size={15} />
-            Nueva Area
-          </button>
+          {puedeGestionar && (
+            <button
+              onClick={() => setMostrarCrear(true)}
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shrink-0"
+            >
+              <Plus size={15} />
+              Nueva Área
+            </button>
+          )}
         </div>
 
         {cargando && (

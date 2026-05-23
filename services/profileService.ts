@@ -15,8 +15,8 @@ import { AREAS, EMPLOYEES, POSITIONS } from "@/lib/api/endpoints";
 import { createClient } from "@/utils/supabase/client";
 import type { AdminDto } from "@/types/api/admin";
 import type { EmployeeDto, EmployeeStatus, UpdateProfilePayload } from "@/types/api/employee";
-import type { PositionTreeNode } from "@/types/api/position";
 import type { EstadoPerfilUsuario, UserProfile } from "@/types/funcionario";
+import { findEmpleadoEnCargo } from "./orgLookupService";
 
 function statusBackendToUi(s?: EmployeeStatus): EstadoPerfilUsuario {
   switch (s) {
@@ -40,6 +40,7 @@ export function empleadoDtoToUserProfile(dto: EmployeeDto): UserProfile {
     nombre: dto.first_name ?? "",
     apellidos: dto.last_name ?? "",
     cargo: dto.position?.name ?? "",
+    cargoId: dto.position?.id ?? dto.position?.id_position ?? dto.id_position,
     area: dto.position?.area?.name ?? dto.area?.name ?? "",
     email: dto.email ?? "",
     phone: "",
@@ -82,32 +83,11 @@ async function getSupabaseUserId(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
-// Busca dentro del árbol de posiciones quién ocupa una posición específica.
-// El backend embebe un empleado por posición vía Map (limitación documentada
-// en orgChartService); si hay >1 asignado solo veremos el último. Suficiente
-// para resolver "quién es tu jefe" en la mayoría de los casos.
-function findEmployeeInTreeByPositionId(
-  nodes: PositionTreeNode[],
-  targetId: number,
-): { first_name?: string; last_name?: string } | null {
-  const stack = [...nodes];
-  while (stack.length) {
-    const node = stack.pop();
-    if (!node) continue;
-    const id = node.id ?? node.id_position;
-    if (id === targetId && node.employee) {
-      return node.employee;
-    }
-    if (node.children?.length) stack.push(...node.children);
-  }
-  return null;
-}
-
 // El backend `getMyProfile` no incluye position, area ni cargo superior.
 // Enriquecemos client-side: cargo → área → cargo padre + empleado del cargo
-// padre (para "reporta a"). Usamos `positions-tree` (público) para resolver
-// el nombre del empleado superior, evitando el 403 que daría `findUserById`
-// al consultar otro empleado siendo solo "funcionario".
+// padre (para "reporta a"). Usamos `findEmpleadoEnCargo` que intenta findAll
+// (trae cualquier status, requiere admin/HT) y cae a positions-tree (público,
+// solo trae status=active) si el rol no tiene permiso.
 async function enrichProfileDto(dto: EmployeeDto): Promise<EmployeeDto> {
   if (!dto.id_position) return dto;
 
@@ -119,7 +99,7 @@ async function enrichProfileDto(dto: EmployeeDto): Promise<EmployeeDto> {
       parent_position_id?: number | null;
     }>(POSITIONS.findOne(dto.id_position));
 
-    const [areaInfo, parentInfo, tree] = await Promise.all([
+    const [areaInfo, parentInfo, jefe] = await Promise.all([
       position?.id_area
         ? apiGet<{ id_area?: number; id?: number; name?: string }>(
             AREAS.findOne(position.id_area),
@@ -131,7 +111,7 @@ async function enrichProfileDto(dto: EmployeeDto): Promise<EmployeeDto> {
           ).catch(() => null)
         : Promise.resolve(null),
       position?.parent_position_id
-        ? apiGet<PositionTreeNode[]>(POSITIONS.tree).catch(() => null)
+        ? findEmpleadoEnCargo(position.parent_position_id)
         : Promise.resolve(null),
     ]);
 
@@ -140,13 +120,7 @@ async function enrichProfileDto(dto: EmployeeDto): Promise<EmployeeDto> {
     // tampoco hay cargo (posición raíz), queda vacío y la UI muestra "—".
     let reportaAValue = "";
     if (parentInfo?.name) {
-      const empleadoPadre =
-        tree && Array.isArray(tree) && position?.parent_position_id
-          ? findEmployeeInTreeByPositionId(tree, position.parent_position_id)
-          : null;
-      const nombreEmpleado = empleadoPadre
-        ? `${empleadoPadre.first_name ?? ""} ${empleadoPadre.last_name ?? ""}`.trim()
-        : "";
+      const nombreEmpleado = jefe?.fullName ?? "";
       reportaAValue = nombreEmpleado
         ? `${nombreEmpleado} — ${parentInfo.name}`
         : parentInfo.name;

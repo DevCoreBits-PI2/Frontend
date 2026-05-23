@@ -20,12 +20,15 @@ import { useAuth } from "@/lib/auth/AuthContext";
 // Solo campos que el backend acepta en `InviteUserDto` + los que la UI necesita
 // para navegación (areaId es filtro local del select de cargos). `hireDate` y
 // `contractType` salieron del registro porque viven en el módulo de contratos.
+// Solo campos que efectivamente se envían al backend (InviteUserDto). El
+// teléfono se quitó porque el backend lo ignora y confundía al admin. La foto
+// se conserva en state para preview en Review pero tampoco se envía (no hay
+// campo en el DTO); queda como mejora pendiente cuando el backend lo soporte.
 interface RegisterFormState {
   fullName?: string;
   documentType?: string;
   documentNumber?: string;
   email?: string;
-  phone?: string;
   photo?: string;
   age?: number;
   areaId?: string;
@@ -98,6 +101,19 @@ const Page = () => {
         errors.documentNumber = "El documento debe ser mayor a 0.";
       } else if (docNum > PG_INT32_MAX) {
         errors.documentNumber = `El documento excede el máximo permitido por el sistema (${PG_INT32_MAX.toLocaleString("es-CO")}). Verifica los dígitos.`;
+      } else if (data.documentType) {
+        // Validación por tipo de documento (Colombia).
+        // - DNI (cédula colombiana): 6-10 dígitos.
+        // - Carnet de extranjería (CE): 6-10 dígitos.
+        // - Passport: típicamente 6-12 caracteres alfanuméricos; acá usamos
+        //   solo dígitos por el campo `code` int32 del backend.
+        if (
+          (data.documentType === "dni" || data.documentType === "ce") &&
+          (docRaw.length < 6 || docRaw.length > 10)
+        ) {
+          errors.documentNumber = "Las cédulas/CE colombianas tienen entre 6 y 10 dígitos.";
+        }
+        // Para passport no validamos longitud específica (varía por país).
       }
     }
 
@@ -146,6 +162,30 @@ const Page = () => {
       }
     }
 
+    if (step === 2) {
+      // Area y cargo son obligatorios (id_position lo exige el backend).
+      // Validamos ANTES del chequeo de cupos para no fallar de manera confusa.
+      if (!data.areaId) {
+        toast.error("Selecciona un área para continuar.");
+        return;
+      }
+      if (!data.positionId) {
+        toast.error("Selecciona un cargo para continuar.");
+        return;
+      }
+      // Bloqueo: no se puede invitar a un empleado a un cargo sin cupos.
+      // `vacancies` y `empleadosAsignados` vienen del enriquecimiento de
+      // `obtenerPosicionesParaRegistro`; si por alguna razón no los tenemos,
+      // dejamos pasar y el backend acepta (no valida vacantes).
+      const cargo = positions.find((p) => p.id === data.positionId);
+      if (cargo && cargo.vacancies - cargo.empleadosAsignados <= 0) {
+        toast.error(
+          `El cargo "${cargo.nombre}" no tiene cupos disponibles (${cargo.empleadosAsignados}/${cargo.vacancies}). Elegí otro cargo o ampliá las vacantes desde Posiciones.`,
+        );
+        return;
+      }
+    }
+
     if (step < 3) {
       setStep(step + 1);
       return;
@@ -167,7 +207,7 @@ const Page = () => {
         documentType: data.documentType ?? "",
         documentNumber: data.documentNumber ?? "",
         email: data.email ?? "",
-        phone: data.phone ?? "",
+        phone: "",
         photo: data.photo,
         areaId: data.areaId,
         positionId: data.positionId,

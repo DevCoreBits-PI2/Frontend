@@ -9,6 +9,8 @@ import type { EmployeeDto } from "@/types/api/employee";
 import type { AdminDto } from "@/types/api/admin";
 import { obtenerAdminActual } from "@/services/adminService";
 import { PositionId, type AuthUserContext } from "./roles";
+import { setCurrentAuthUser } from "./authCache";
+import SessionLoadingScreen from "@/components/auth/SessionLoadingScreen";
 
 interface AuthState {
   ready: boolean;
@@ -178,6 +180,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [session, profile, adminProfile],
   );
 
+  // Espejo del authUser en el cache module-level para que los services puedan
+  // chequear permisos sin pasar por React. Se setea DURANTE el render (no en
+  // useEffect) para que el cache ya esté disponible cuando los hijos disparen
+  // sus useEffects — los effects de hijos corren después del commit, así que
+  // un useEffect aquí actualizaría el cache *después* de que un hijo ya hizo
+  // su primer fetch. Setearlo en render evita ese race.
+  setCurrentAuthUser(authUser);
+
   const value = useMemo<AuthState>(
     () => ({
       ready,
@@ -192,7 +202,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [ready, session, user, profile, adminProfile, authUser, refreshProfile, signOut],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  // Mientras Supabase resuelve la sesión y se carga el perfil mostramos un
+  // splash global. Sin esto, las páginas se renderizan con authUser=null y
+  // pueden parpadear ("login redirect" → render real) o disparar fetches con
+  // headers vacíos.
+  return (
+    <AuthContext.Provider value={value}>
+      {!ready && <SessionLoadingScreen />}
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthState {

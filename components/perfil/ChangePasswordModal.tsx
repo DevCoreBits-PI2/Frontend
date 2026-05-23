@@ -150,7 +150,7 @@ export default function ChangePasswordModal({ isOpen, onClose, onSave }: ChangeP
                   onChange={(event) => setNewPassword(event.target.value)}
                   className={inputClass(errors.newPassword)}
                   autoComplete="new-password"
-                  placeholder="Precisión2024!"
+                  placeholder="Mínimo 8 caracteres, mayúscula, número y símbolo"
                 />
                 <button
                   type="button"

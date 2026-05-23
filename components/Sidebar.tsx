@@ -10,10 +10,16 @@ import {
   FolderKanban,
   FileText,
   LogOut,
+  ShieldCheck,
+  BarChart3,
+  QrCode,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth/AuthContext";
-import { canManageHumanTalent, PositionId } from "@/lib/auth/roles";
+import {
+  canManageHumanTalent,
+  PositionId,
+} from "@/lib/auth/roles";
 
 interface SubItem {
   etiqueta: string;
@@ -55,6 +61,9 @@ const ITEMS_NAV: NavItem[] = [
     ],
   },
   { etiqueta: "Contratos", href: "/dashboard/contratos", icono: FileText, requireHumanTalent: true },
+  { etiqueta: "Reportes", href: "/dashboard/reportes", icono: BarChart3, requireHumanTalent: true },
+  { etiqueta: "Escanear QR", href: "/dashboard/scan-qr", icono: QrCode, requireHumanTalent: true },
+  { etiqueta: "Administradores", href: "/dashboard/admins", icono: ShieldCheck, requireAdmin: true },
 ];
 
 function puedeVer(

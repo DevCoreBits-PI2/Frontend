@@ -38,6 +38,15 @@ const WorkDetailsStep: React.FC<Props> = ({ data, onChange }) => {
     return allPositions.filter((p) => p.areaId === data.areaId);
   }, [allPositions, data.areaId]);
 
+  // Calcula cupos del cargo seleccionado para mostrar la advertencia al pie.
+  const cargoElegido = useMemo(
+    () => positions.find((p) => p.id === data.positionId) ?? null,
+    [positions, data.positionId],
+  );
+  const cuposCargoElegido = cargoElegido
+    ? cargoElegido.vacancies - cargoElegido.empleadosAsignados
+    : null;
+
   return (
     <div className="grid grid-cols-2 gap-6">
       <div>
@@ -68,12 +77,25 @@ const WorkDetailsStep: React.FC<Props> = ({ data, onChange }) => {
           className="w-full px-4 py-3 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC71] focus:border-[#2ECC71] text-gray-700"
         >
           <option value="">Seleccionar Cargo</option>
-          {positions.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nombre}
-            </option>
-          ))}
+          {positions.map((p) => {
+            const disponibles = p.vacancies - p.empleadosAsignados;
+            const sinCupos = disponibles <= 0;
+            return (
+              <option key={p.id} value={p.id}>
+                {p.nombre} {sinCupos
+                  ? `(sin cupos — ${p.empleadosAsignados}/${p.vacancies})`
+                  : `(${disponibles} cupo${disponibles === 1 ? "" : "s"} disponible${disponibles === 1 ? "" : "s"})`}
+              </option>
+            );
+          })}
         </select>
+        {cargoElegido && cuposCargoElegido !== null && cuposCargoElegido <= 0 && (
+          <p className="mt-2 text-xs font-medium text-rose-600">
+            El cargo seleccionado ya no tiene cupos disponibles
+            ({cargoElegido.empleadosAsignados} ocupados de {cargoElegido.vacancies}). Elegí
+            otro o ampliá las vacantes del cargo desde Posiciones antes de continuar.
+          </p>
+        )}
       </div>
 
       <div className="col-span-2 rounded-lg bg-[#f4f7f8] border border-[#d1dde2] p-4 text-xs text-[#576975] leading-relaxed">

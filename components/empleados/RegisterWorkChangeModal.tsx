@@ -6,23 +6,25 @@ import { X, Calendar, ChevronDown, TrendingUp } from "lucide-react";
 import { obtenerAreas, Area } from "@/services/areasService";
 import { obtenerPosiciones, Position } from "@/services/positionsService";
 
-type TipoCambio = "traslado" | "ascenso" | "modificacion_contractual" | "cambio_salarial";
-type TipoCambioSalarial = "aumento" | "disminucion";
+// "Contract Modification" se quitó: el backend no permite tocar contratos desde
+// este flujo. La modificación contractual real se hace en el módulo de Contratos.
+type TipoCambio = "traslado" | "ascenso" | "cambio_salarial";
 
 const TIPOS_CAMBIO: { valor: TipoCambio; etiqueta: string }[] = [
   { valor: "traslado", etiqueta: "Transfer" },
   { valor: "ascenso", etiqueta: "Promotion" },
-  { valor: "modificacion_contractual", etiqueta: "Contract Modification" },
-  { valor: "cambio_salarial", etiqueta: "Salary Modification" },
+  { valor: "cambio_salarial", etiqueta: "Salary Increase" },
 ];
 
+// Política: solo se permiten aumentos salariales desde acá; los recortes
+// requieren un proceso distinto (legal/contractual) y se manejan editando el
+// contrato vigente. Por eso ya no existe `tipoCambioSalarial`.
 export interface FormData {
   tipo: TipoCambio | "";
   fechaEfectiva: string;
   areaDestino: string;
   nuevaPosicion: string;
   justificacion: string;
-  tipoCambioSalarial: TipoCambioSalarial;
   porcentajeAjuste: string;
 }
 
@@ -30,13 +32,22 @@ interface Props {
   isOpen: boolean;
   onCerrar: () => void;
   onGuardar: (datos: FormData) => Promise<void>;
-  salarioActual?: number;
+  /** Salario base del CARGO actual del empleado (positions.base_salary). El
+   *  backend no guarda salario por empleado; este es el único dato salarial
+   *  estructurado disponible. `null` si el cargo no lo tiene definido. */
+  salarioBaseCargo?: number | null;
+  /** Cargo actual del empleado (para mostrar en la UI de Promotion). */
+  cargoActualNombre?: string;
+  /** Cargo padre en la jerarquía. null si el cargo actual es raíz (no se puede
+   *  promover). Cuando es Promotion, el handler envía este id al backend. */
+  cargoSuperiorId?: number | null;
+  cargoSuperiorNombre?: string | null;
 }
 
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("es-CO", {
     style: "currency",
-    currency: "USD",
+    currency: "COP",
     maximumFractionDigits: 0,
   }).format(value);
 }
@@ -45,7 +56,10 @@ export default function RegisterWorkChangeModal({
   isOpen,
   onCerrar,
   onGuardar,
-  salarioActual = 4_320_000,
+  salarioBaseCargo,
+  cargoActualNombre,
+  cargoSuperiorId,
+  cargoSuperiorNombre,
 }: Props) {
   const [form, setForm] = useState<FormData>({
     tipo: "",
@@ -53,7 +67,6 @@ export default function RegisterWorkChangeModal({
     areaDestino: "",
     nuevaPosicion: "",
     justificacion: "",
-    tipoCambioSalarial: "aumento",
     porcentajeAjuste: "",
   });
   const [areas, setAreas] = useState<Area[]>([]);
@@ -84,19 +97,27 @@ export default function RegisterWorkChangeModal({
 
   const esCambioSalarial = form.tipo === "cambio_salarial";
   const esTraslado = form.tipo === "traslado";
+  const esAscenso = form.tipo === "ascenso";
 
   const porcentajeNum = parseFloat(form.porcentajeAjuste) || 0;
-  const salarioEstimado =
-    form.tipoCambioSalarial === "aumento"
-      ? salarioActual * (1 + porcentajeNum / 100)
-      : salarioActual * (1 - porcentajeNum / 100);
+  // Solo aumentos. Si el cargo no tiene base_salary definido, no podemos
+  // calcular el estimado: se muestra como N/A y se bloquea el guardado.
+  const tieneSalarioBase = typeof salarioBaseCargo === "number" && salarioBaseCargo > 0;
+  const salarioEstimado = tieneSalarioBase
+    ? (salarioBaseCargo as number) * (1 + porcentajeNum / 100)
+    : 0;
+
+  // Promotion solo es válida si el cargo actual tiene un cargo padre definido
+  // en `positions.parent_position_id`. La UI lo bloquea cuando no.
+  const tieneCargoSuperior = typeof cargoSuperiorId === "number";
 
   const puedeGuardar =
     form.tipo !== "" &&
     form.fechaEfectiva !== "" &&
     form.justificacion.trim() !== "" &&
     (!esTraslado || (form.areaDestino !== "" && form.nuevaPosicion !== "")) &&
-    (!esCambioSalarial || (form.porcentajeAjuste !== "" && porcentajeNum > 0));
+    (!esAscenso || tieneCargoSuperior) &&
+    (!esCambioSalarial || (form.porcentajeAjuste !== "" && porcentajeNum > 0 && tieneSalarioBase));
 
   const handleGuardar = async () => {
     if (!puedeGuardar) return;
@@ -116,7 +137,6 @@ export default function RegisterWorkChangeModal({
       areaDestino: "",
       nuevaPosicion: "",
       justificacion: "",
-      tipoCambioSalarial: "aumento",
       porcentajeAjuste: "",
     });
     onCerrar();
@@ -166,7 +186,6 @@ export default function RegisterWorkChangeModal({
                     areaDestino: "",
                     nuevaPosicion: "",
                     porcentajeAjuste: "",
-                    tipoCambioSalarial: "aumento",
                   }))
                 }
                 className="w-full appearance-none px-3 py-2 text-sm border border-[#d1dde2] rounded-xl text-[#0F1819] bg-white focus:outline-none focus:ring-1 focus:ring-[#4f98b0] cursor-pointer"
@@ -196,53 +215,58 @@ export default function RegisterWorkChangeModal({
             </div>
           </div>
 
-          {/* Salary Change fields */}
+          {/* Promotion — siempre al cargo padre en la jerarquía. El admin no
+              elige cargo destino; se infiere de positions.parent_position_id. */}
+          {esAscenso && (
+            <div className={`rounded-xl border px-4 py-3 ${
+              tieneCargoSuperior
+                ? "bg-emerald-50 border-emerald-200"
+                : "bg-amber-50 border-amber-200"
+            }`}>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[#4f98b0]">
+                Cambio de cargo (ascenso)
+              </p>
+              {tieneCargoSuperior ? (
+                <>
+                  <p className="text-sm text-[#0F1819] mt-1 leading-snug">
+                    Promover de{" "}
+                    <strong>{cargoActualNombre ?? "cargo actual"}</strong> a{" "}
+                    <strong>{cargoSuperiorNombre}</strong>.
+                  </p>
+                  <p className="text-[11px] text-[#576975] leading-relaxed mt-1.5">
+                    Al guardar se actualizará el cargo del empleado al cargo superior en la jerarquía organizacional.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-amber-800 mt-1 leading-snug">
+                  El cargo actual {cargoActualNombre ? <strong>({cargoActualNombre})</strong> : ""} no tiene un cargo superior definido en la jerarquía. No se puede promover desde acá.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Salary Change fields — solo aumentos */}
           {esCambioSalarial && (
             <>
-              {/* Increase / Decrease toggle */}
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, tipoCambioSalarial: "aumento" }))}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-semibold border transition-colors ${
-                    form.tipoCambioSalarial === "aumento"
-                      ? "bg-emerald-500 border-emerald-500 text-white"
-                      : "bg-white border-[#d1dde2] text-[#8aa3ad] hover:border-[#4f98b0]"
-                  }`}
-                >
-                  <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
-                    form.tipoCambioSalarial === "aumento" ? "border-white" : "border-[#8aa3ad]"
-                  }`}>
-                    {form.tipoCambioSalarial === "aumento" && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                    )}
-                  </span>
-                  Increase
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, tipoCambioSalarial: "disminucion" }))}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-semibold border transition-colors ${
-                    form.tipoCambioSalarial === "disminucion"
-                      ? "bg-rose-500 border-rose-500 text-white"
-                      : "bg-white border-[#d1dde2] text-[#8aa3ad] hover:border-rose-400"
-                  }`}
-                >
-                  <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
-                    form.tipoCambioSalarial === "disminucion" ? "border-white" : "border-[#8aa3ad]"
-                  }`}>
-                    {form.tipoCambioSalarial === "disminucion" && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                    )}
-                  </span>
-                  Decrease
-                </button>
+              {/* Salario base actual del cargo */}
+              <div className="rounded-xl bg-[#f4f7f8] border border-[#d1dde2] px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[#4f98b0]">
+                  Salario base del cargo
+                </p>
+                <p className="text-base font-bold text-[#0F1819] leading-tight mt-0.5">
+                  {tieneSalarioBase ? formatCurrency(salarioBaseCargo as number) : "No definido"}
+                </p>
+                <p className="text-[11px] text-[#8aa3ad] leading-relaxed mt-1.5">
+                  Es el salario de referencia del cargo del empleado. El aumento se registra
+                  en su trayectoria y no modifica el salario base del cargo (no afecta a otros
+                  empleados con el mismo cargo).
+                </p>
               </div>
 
-              {/* Adjustment Percentage */}
+              {/* Adjustment Percentage — solo aumento */}
               <div>
                 <label className="block text-xs font-semibold text-[#0F1819] mb-1">
-                  Adjustment Percentage
+                  Porcentaje de aumento
                 </label>
                 <div className="relative">
                   <input
@@ -253,26 +277,35 @@ export default function RegisterWorkChangeModal({
                     value={form.porcentajeAjuste}
                     onChange={(e) => setForm((prev) => ({ ...prev, porcentajeAjuste: e.target.value }))}
                     placeholder="0.00"
-                    className="w-full pl-3 pr-8 py-2 text-sm border border-[#d1dde2] rounded-xl text-[#0F1819] bg-white focus:outline-none focus:ring-1 focus:ring-[#4f98b0] placeholder:text-[#c5d5db]"
+                    disabled={!tieneSalarioBase}
+                    className="w-full pl-3 pr-8 py-2 text-sm border border-[#d1dde2] rounded-xl text-[#0F1819] bg-white focus:outline-none focus:ring-1 focus:ring-[#4f98b0] placeholder:text-[#c5d5db] disabled:cursor-not-allowed disabled:bg-[#f8fafb]"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[#8aa3ad] pointer-events-none">%</span>
                 </div>
+                {!tieneSalarioBase && (
+                  <p className="mt-1 text-[11px] text-amber-600">
+                    El cargo no tiene un salario base definido. Edita el cargo desde el módulo
+                    de Posiciones para poder registrar aumentos individuales.
+                  </p>
+                )}
               </div>
 
               {/* New Estimated Salary */}
-              <div className="flex items-center gap-3 bg-[#f0f7fa] border border-[#bdd5ea] rounded-xl px-4 py-3">
-                <div className="w-9 h-9 rounded-full bg-[#203D47] flex items-center justify-center shrink-0">
-                  <TrendingUp size={16} className="text-white" />
+              {tieneSalarioBase && (
+                <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                  <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
+                    <TrendingUp size={16} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">
+                      Salario nuevo estimado
+                    </p>
+                    <p className="text-lg font-bold text-[#0F1819] leading-tight">
+                      {formatCurrency(salarioEstimado)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-[#4f98b0]">
-                    New Estimated Salary
-                  </p>
-                  <p className="text-lg font-bold text-[#0F1819] leading-tight">
-                    {formatCurrency(salarioEstimado)}
-                  </p>
-                </div>
-              </div>
+              )}
             </>
           )}
 

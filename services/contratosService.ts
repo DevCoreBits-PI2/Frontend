@@ -87,6 +87,20 @@ function deriveEstado(dto: ContractDto): { estado: EstadoContrato; validez: Vali
     return { estado: "RENOVADO", validez: "COMPLETED" };
   }
   if (status === "expired") {
+    // Workaround: el gateway tiene un bug en su enum `contract_status` (solo
+    // acepta `valid` y `expired`), así que NO podemos enviar `annulled` al
+    // backend. Cuando el admin "cancela" un contrato lo marcamos como expired.
+    // Para distinguir visualmente una cancelación de una expiración real:
+    //   - Si el contrato tiene fecha fin FUTURA pero está marcado expired,
+    //     entendemos que fue cancelado manualmente → "ANULADO".
+    //   - Si NO tiene fecha fin (indefinido) y está expired, no pudo haberse
+    //     expirado por tiempo → fue cancelación manual → "ANULADO".
+    //   - Si la fecha fin ya pasó, fue expirado naturalmente → "EXPIRADO".
+    // Cuando el bug del backend se arregle, esto se puede simplificar volviendo
+    // a usar `annulled` directo.
+    if (!end || end.getTime() > today.getTime()) {
+      return { estado: "ANULADO", validez: "VOIDED" };
+    }
     return { estado: "EXPIRADO", validez: "EXPIRED" };
   }
   if (end && end.getTime() < today.getTime()) {
@@ -221,10 +235,38 @@ export const eliminarContrato = async (id: string): Promise<void> => {
 
 export const anularContrato = async (id: string): Promise<Contrato> => {
   const realId = id.startsWith("c-") ? Number(id.slice(2)) : Number(id);
+  // Bug del backend: el enum `contract_status` del gateway solo acepta
+  // `valid` y `expired` (le faltan `renewed` y `annulled`). Mandar
+  // `contractStatus: "annulled"` rebota con 400 "valid status are: valid,expired".
+  // Workaround: enviamos `expired`. `deriveEstado` después detecta que la
+  // fecha fin es futura y lo muestra como "ANULADO" en la UI para preservar
+  // la semántica visual.
   const dto = await apiPatch<ContractDto>(CONTRACTS.update(realId), {
-    contractStatus: "annulled",
+    contractStatus: "expired",
   });
   return dtoToContrato(dto);
+};
+
+// Reglas de duración por tipo de contrato (en días). Validación pura del
+// frontend: el backend no las exige. Basadas en derecho laboral colombiano
+// típico. Los rangos son inclusivos. `null` significa sin límite.
+//
+//   FIJO         → mín. 30 días, máx. 3 años (Art. 46 CST).
+//   INDEFINIDO   → sin fecha fin, no aplica.
+//   OBRA         → depende de la obra; no hay máximo legal.
+//   TEMPORAL     → contratos ocasionales/transitorios, máx. 30 días (Art. 6 CST).
+//   APRENDIZAJE  → mín. 6 meses, máx. 24 meses (Ley 789/2002 art. 30).
+//   SERVICIOS    → máx. 11 meses (práctica común para evitar laboralización).
+export const DURATION_RULES: Record<
+  TipoContrato,
+  { minDays: number | null; maxDays: number | null; descripcion: string }
+> = {
+  FIJO:           { minDays: 30,  maxDays: 365 * 3, descripcion: "entre 30 días y 3 años" },
+  INDEFINIDO:     { minDays: null, maxDays: null,    descripcion: "sin fecha fin" },
+  OBRA:           { minDays: 1,    maxDays: null,    descripcion: "mínimo 1 día" },
+  TIEMPO_PARCIAL: { minDays: 1,    maxDays: 30,      descripcion: "máximo 30 días" },
+  APRENDIZAJE:    { minDays: 180,  maxDays: 365 * 2, descripcion: "entre 6 y 24 meses" },
+  SERVICIO:       { minDays: 1,    maxDays: 330,     descripcion: "máximo ~11 meses" },
 };
 
 // Validación local (no hay endpoint dedicado); se evalúa contra los contratos
@@ -233,6 +275,39 @@ export const anularContrato = async (id: string): Promise<Contrato> => {
 export interface ResultadoValidacion {
   rangoFechasValido: boolean;
   sinSolapamiento: boolean;
+  duracionValida: boolean;
+  mensajeDuracion?: string;
+}
+
+// Calcula la duración del contrato en días (entre fechas) y la compara con
+// las reglas legales del tipo. Si el contrato es INDEFINIDO devuelve siempre
+// válido (no aplica). Si el tipo no se pasa, no chequea duración.
+function validarDuracion(
+  tipo: TipoContrato | undefined,
+  inicio: Date,
+  fin: Date | null,
+): { duracionValida: boolean; mensajeDuracion?: string } {
+  if (!tipo) return { duracionValida: true };
+  const rules = DURATION_RULES[tipo];
+  if (tipo === "INDEFINIDO") return { duracionValida: true };
+  if (!fin) return { duracionValida: true };
+
+  const dias = Math.round((fin.getTime() - inicio.getTime()) / 86_400_000);
+  if (dias <= 0) return { duracionValida: true }; // rangoFechasValido lo cubre
+
+  if (rules.minDays !== null && dias < rules.minDays) {
+    return {
+      duracionValida: false,
+      mensajeDuracion: `La duración de un contrato ${tipo === "FIJO" ? "fijo" : tipo === "TIEMPO_PARCIAL" ? "temporal" : tipo === "APRENDIZAJE" ? "de aprendizaje" : tipo === "SERVICIO" ? "de prestación de servicios" : "de obra"} debe ser ${rules.descripcion}. Actualmente: ${dias} día(s).`,
+    };
+  }
+  if (rules.maxDays !== null && dias > rules.maxDays) {
+    return {
+      duracionValida: false,
+      mensajeDuracion: `La duración de un contrato ${tipo === "FIJO" ? "fijo" : tipo === "TIEMPO_PARCIAL" ? "temporal" : tipo === "APRENDIZAJE" ? "de aprendizaje" : tipo === "SERVICIO" ? "de prestación de servicios" : "de obra"} debe ser ${rules.descripcion}. Actualmente: ${dias} día(s).`,
+    };
+  }
+  return { duracionValida: true };
 }
 
 export const validarContrato = async (
@@ -240,6 +315,7 @@ export const validarContrato = async (
   fechaInicio: string,
   fechaFin: string | null,
   excludeContratoId?: string,
+  tipo?: TipoContrato,
 ): Promise<ResultadoValidacion> => {
   const inicio = new Date(fechaInicio);
   const fin = fechaFin ? new Date(fechaFin) : null;
@@ -264,5 +340,7 @@ export const validarContrato = async (
     sinSolapamiento = true; // No se pudo verificar; el backend hará la validación final.
   }
 
-  return { rangoFechasValido, sinSolapamiento };
+  const { duracionValida, mensajeDuracion } = validarDuracion(tipo, inicio, fin);
+
+  return { rangoFechasValido, sinSolapamiento, duracionValida, mensajeDuracion };
 };

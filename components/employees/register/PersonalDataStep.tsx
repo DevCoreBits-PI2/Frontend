@@ -104,34 +104,20 @@ const PersonalDataStep: React.FC<Props> = ({ data, onChange, errors = {} }) => {
           </div>
         </div>
 
-        {/* Email & Phone */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-              Correo Electrónico
-            </label>
-            <input
-              type="email"
-              value={data.email || ""}
-              onChange={(e) => onChange({ email: e.target.value })}
-              className={inputClass(!!errors.email)}
-              placeholder="john.doe@example.com"
-            />
-            <FieldError message={errors.email} />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
-              Teléfono
-            </label>
-            <input
-              type="tel"
-              value={data.phone || ""}
-              onChange={(e) => onChange({ phone: e.target.value })}
-              className={inputClass(!!errors.phone)}
-              placeholder="+573200000000"
-            />
-            <FieldError message={errors.phone} />
-          </div>
+        {/* Email — el backend no acepta teléfono en InviteUserDto. Si en el
+            futuro se agrega, recuperar el input desde el historial git. */}
+        <div>
+          <label className="block text-xs font-semibold text-[#203D47] uppercase mb-2">
+            Correo Electrónico
+          </label>
+          <input
+            type="email"
+            value={data.email || ""}
+            onChange={(e) => onChange({ email: e.target.value })}
+            className={inputClass(!!errors.email)}
+            placeholder="john.doe@example.com"
+          />
+          <FieldError message={errors.email} />
         </div>
 
         {/* Edad — requerida por el backend (@IsInt). El form no la pedía y se */}

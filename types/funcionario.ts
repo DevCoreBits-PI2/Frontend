@@ -35,6 +35,9 @@ export interface UserProfile {
   nombre: string;
   apellidos: string;
   cargo: string;
+  /** id_position numérico del cargo actual (para resolver subordinados por
+   *  jerarquía). Opcional porque los admins no lo tienen. */
+  cargoId?: number;
   area: string;
   email: string;
   // El backend de empleados no expone phone/birthdate/office/location.

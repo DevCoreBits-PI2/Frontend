@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { crearArea } from "@/services/areasService";
 import { useAuth } from "@/lib/auth/AuthContext";
 import toast from "react-hot-toast";
+import { translateBackendError } from "@/lib/api/translateError";
 
 interface NewAreaModalProps {
   onCerrar: () => void;
@@ -19,8 +20,14 @@ export default function NewAreaModal({ onCerrar, onCreada }: NewAreaModalProps) 
 
   const validar = () => {
     const nuevosErrores: typeof errores = {};
-    if (!nombre.trim()) nuevosErrores.nombre = "El nombre del area es obligatorio.";
-    if (!descripcion.trim()) nuevosErrores.descripcion = "La descripcion es obligatoria.";
+    const n = nombre.trim();
+    if (!n) nuevosErrores.nombre = "El nombre del área es obligatorio.";
+    else if (n.length < 3) nuevosErrores.nombre = "Debe tener al menos 3 caracteres.";
+    else if (n.length > 100) nuevosErrores.nombre = "No puede superar 100 caracteres.";
+    const d = descripcion.trim();
+    if (!d) nuevosErrores.descripcion = "La descripción es obligatoria.";
+    else if (d.length < 3) nuevosErrores.descripcion = "Debe tener al menos 3 caracteres.";
+    else if (d.length > 500) nuevosErrores.descripcion = "No puede superar 500 caracteres.";
     setErrores(nuevosErrores);
     return Object.keys(nuevosErrores).length === 0;
   };
@@ -48,8 +55,8 @@ export default function NewAreaModal({ onCerrar, onCreada }: NewAreaModalProps) 
       });
       onCreada();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "No se pudo crear el área.";
-      toast.error(msg);
+      const raw = err instanceof Error ? err.message : "";
+      toast.error(translateBackendError(raw) || "No se pudo crear el área.");
     } finally {
       setGuardando(false);
     }

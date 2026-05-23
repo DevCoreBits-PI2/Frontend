@@ -292,7 +292,21 @@ function ContractDetailPanel({
   const estado = badgeEstado(contrato.estado);
   const tipo = etiquetaTipo(contrato.tipo);
   const router = useRouter();
-  const puedeRenovar = contrato.estado === "ACTIVO";
+  // Renovar = solo si está ACTIVO y tiene fecha fin (NO indefinidos). El
+  // backend rechaza la renovación de indefinidos ("Indefinite-term contracts
+  // cannot be renewed because they do not have an end date").
+  const puedeRenovar =
+    contrato.estado === "ACTIVO" && contrato.tipo !== "INDEFINIDO";
+  // Cancelar/anular = solo si está ACTIVO. El backend rechaza la modificación
+  // (incluida pasar a `annulled`) si está expirado, renovado o ya anulado.
+  const puedeAnular = contrato.estado === "ACTIVO";
+  // Editar = solo ACTIVO. Para INDEFINIDO bloqueamos también: lo único editable
+  // sería `conditions` (texto del contrato), pero modificar las condiciones de
+  // un indefinido vigente es un cambio legal que requiere anular + crear nuevo.
+  // Para FIJO el edit sí tiene sentido (extender/acortar fecha fin, ajustes
+  // menores en notas).
+  const puedeEditar =
+    contrato.estado === "ACTIVO" && contrato.tipo !== "INDEFINIDO";
 
   useEffect(() => {
     setMounted(true);
@@ -433,6 +447,13 @@ function ContractDetailPanel({
               type="button"
               onClick={() => setRenewOpen(true)}
               disabled={!puedeRenovar}
+              title={
+                contrato.tipo === "INDEFINIDO"
+                  ? "Los contratos indefinidos no se pueden renovar (no tienen fecha de fin)."
+                  : contrato.estado !== "ACTIVO"
+                    ? `Solo se pueden renovar contratos en estado ACTIVO (este está ${contrato.estado}).`
+                    : undefined
+              }
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#2ECC71] py-3 text-sm font-semibold text-[#2ECC71] transition-colors hover:bg-[#2ECC71]/5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw size={14} />
@@ -440,19 +461,32 @@ function ContractDetailPanel({
             </button>
             <button
               type="button"
+              disabled={!puedeEditar}
               onClick={() => {
                 onClose();
                 router.push(`/dashboard/empleados/${contrato.idEmpleado}/contratos/${contrato.id}/editar`);
               }}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-400 py-3 text-sm font-semibold text-sky-500 transition-colors hover:bg-sky-50"
+              title={
+                puedeEditar
+                  ? undefined
+                  : contrato.tipo === "INDEFINIDO"
+                    ? "Los contratos indefinidos no se editan. Para cambiar condiciones, anula este contrato y crea uno nuevo."
+                    : `Solo se pueden editar contratos en estado ACTIVO (este está ${contrato.estado}).`
+              }
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-400 py-3 text-sm font-semibold text-sky-500 transition-colors hover:bg-sky-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Pencil size={14} />
               Editar Contrato
             </button>
             <button
               type="button"
-              disabled={contrato.estado === "ANULADO"}
+              disabled={!puedeAnular}
               onClick={() => setShowVoidConfirm(true)}
+              title={
+                puedeAnular
+                  ? undefined
+                  : `Solo se pueden anular contratos en estado ACTIVO (este está ${contrato.estado}).`
+              }
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-400 py-3 text-sm font-semibold text-rose-500 transition-colors hover:bg-rose-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Ban size={14} />

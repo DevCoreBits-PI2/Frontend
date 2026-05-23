@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Briefcase, Building2 } from "lucide-react";
 import { Position, editarPosicion } from "@/services/positionsService";
 import { Area } from "@/services/areasService";
+import { translateBackendError } from "@/lib/api/translateError";
 
 interface EditPositionModalProps {
   isOpen: boolean;
@@ -47,33 +48,85 @@ export default function EditPositionModal({
     }
   }, [position, isOpen]);
 
+  // Empleados ya asignados al cargo, calculado por el enrich del positionsService.
+  // Si la prop `position` no llegó enriquecida (caso borde), trata como 0.
+  const empleadosAsignados = position?.empleados.length ?? 0;
+  // Warning visible cuando el nuevo número de vacantes es menor que los asignados.
+  // El backend NO valida esto: deja el cargo "sobreasignado" sin chistar.
+  const vacancesValueNum = Number(vacancies);
+  const vacanciesValidNumber = Number.isInteger(vacancesValueNum) && vacancesValueNum >= 1;
+  const dejariaSobreasignado =
+    vacanciesValidNumber && vacancesValueNum < empleadosAsignados;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!position) {
+      setError("No position selected");
+      return;
+    }
+    // Reglas alineadas con el backend (`normalizeName` exige 3-100).
+    const n = nombre.trim();
+    if (!n) {
+      setError("El nombre de la posición es obligatorio.");
+      return;
+    }
+    if (n.length < 3 || n.length > 100) {
+      setError("El nombre debe tener entre 3 y 100 caracteres.");
+      return;
+    }
+    const d = description.trim();
+    if (!d) {
+      setError("La descripción es obligatoria.");
+      return;
+    }
+    if (d.length < 3 || d.length > 500) {
+      setError("La descripción debe tener entre 3 y 500 caracteres.");
+      return;
+    }
+    if (!areaIdNum) {
+      setError("Selecciona un área.");
+      return;
+    }
+
+    const vacN = Number(vacancies);
+    if (!Number.isInteger(vacN) || vacN < 1) {
+      setError("Vacantes debe ser un entero ≥ 1.");
+      return;
+    }
+    let salaryN: number | undefined;
+    if (baseSalary.trim()) {
+      const n = Number(baseSalary);
+      if (Number.isNaN(n) || n < 0) {
+        setError("El salario base debe ser ≥ 0.");
+        return;
+      }
+      salaryN = n;
+    }
+
+    // Evita un ciclo trivial donde el padre seleccionado es la posición misma.
+    if (posicionSuperiorId && Number(posicionSuperiorId) === position.rawId) {
+      setError("Una posición no puede ser su propia superior.");
+      return;
+    }
+
+    // Confirmación blanda si el cargo va a quedar sobreasignado. Usamos
+    // `window.confirm` para no introducir otro modal anidado; suficiente para
+    // un caso edge.
+    if (vacN < empleadosAsignados) {
+      const sobrante = empleadosAsignados - vacN;
+      const ok = window.confirm(
+        `Vas a bajar las vacantes a ${vacN}, pero hay ${empleadosAsignados} empleados asignados a este cargo.\n\n` +
+        `El cargo quedará sobreasignado en ${sobrante} persona${sobrante === 1 ? "" : "s"}. ` +
+        `El backend lo acepta, pero no podrás invitar más empleados a este cargo hasta resolverlo.\n\n` +
+        `¿Continuar?`,
+      );
+      if (!ok) return;
+    }
+
     setLoading(true);
-
     try {
-      if (!position) throw new Error("No position selected");
-      if (!nombre.trim()) throw new Error("El nombre de la posición es obligatorio.");
-      if (!description.trim()) throw new Error("La descripción es obligatoria.");
-      if (!areaIdNum) throw new Error("Selecciona un área.");
-
-      const vacN = Number(vacancies);
-      if (!Number.isInteger(vacN) || vacN < 1) {
-        throw new Error("Vacantes debe ser un entero ≥ 1.");
-      }
-      let salaryN: number | undefined;
-      if (baseSalary.trim()) {
-        const n = Number(baseSalary);
-        if (Number.isNaN(n) || n < 0) throw new Error("El salario base debe ser ≥ 0.");
-        salaryN = n;
-      }
-
-      // Evita un ciclo trivial donde el padre seleccionado es la posición misma.
-      if (posicionSuperiorId && Number(posicionSuperiorId) === position.rawId) {
-        throw new Error("Una posición no puede ser su propia superior.");
-      }
-
       const posicionActualizada = await editarPosicion(position.id, {
         nombre: nombre.trim(),
         description: description.trim(),
@@ -87,7 +140,8 @@ export default function EditPositionModal({
       onSuccess?.(posicionActualizada);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo actualizar la posición.");
+      const raw = err instanceof Error ? err.message : "";
+      setError(translateBackendError(raw) || "No se pudo actualizar la posición.");
     } finally {
       setLoading(false);
     }
@@ -100,8 +154,11 @@ export default function EditPositionModal({
       hasError ? "border-red-400 bg-red-50" : "border-[#e8eef0]"
     }`;
 
-  // Filtramos la propia posición de la lista de posibles padres.
-  const posiblesPadres = parentOptions.filter((p) => p.rawId !== position.rawId);
+  // Filtramos la propia posición + posiciones inactivas (el backend rechaza
+  // padres inactivos en `validateParentHierarchy`).
+  const posiblesPadres = parentOptions.filter(
+    (p) => p.rawId !== position.rawId && p.estado === "Active",
+  );
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50">
@@ -219,9 +276,22 @@ export default function EditPositionModal({
                 min={1}
                 value={vacancies}
                 onChange={(e) => setVacancies(e.target.value)}
-                className={inputClass()}
+                className={inputClass(dejariaSobreasignado)}
                 disabled={loading}
               />
+              <p className="text-[11px] text-[#8aa3ad] leading-snug">
+                Actualmente {empleadosAsignados === 0
+                  ? "no hay empleados asignados a este cargo."
+                  : empleadosAsignados === 1
+                    ? "hay 1 empleado asignado a este cargo."
+                    : `hay ${empleadosAsignados} empleados asignados a este cargo.`}
+              </p>
+              {dejariaSobreasignado && (
+                <p className="text-[11px] font-medium text-rose-600 leading-snug">
+                  El cargo quedaría sobreasignado en {empleadosAsignados - vacancesValueNum}
+                  {empleadosAsignados - vacancesValueNum === 1 ? " persona" : " personas"}. Te pediremos confirmación al guardar.
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-widest text-[#8aa3ad]">
