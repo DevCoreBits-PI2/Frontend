@@ -10,6 +10,25 @@ import { escanearQrAutenticado } from "@/services/qrService";
 import { translateBackendError } from "@/lib/api/translateError";
 import type { QrEmployeeView } from "@/types/api/employee";
 
+// Adaptador para mapear la respuesta del backend al tipo QrEmployeeView
+function mapBackendEmployeeToQrView(backendEmployee: any): QrEmployeeView {
+  return {
+    id: backendEmployee.id_employee || backendEmployee.id,
+    first_name: backendEmployee.first_name,
+    last_name: backendEmployee.last_name,
+    email: backendEmployee.email,
+    photo_url: backendEmployee.photo_url || null,
+    status: backendEmployee.status,
+    position: backendEmployee.position ? {
+      id: backendEmployee.position.id || backendEmployee.position.id_position || 0,
+      name: backendEmployee.position.name,
+    } : undefined,
+    area: backendEmployee.area,
+    code: backendEmployee.code,
+    manager: backendEmployee.manager,
+  };
+}
+
 const ESTADO_LABEL: Record<string, { label: string; bg: string; text: string; icon: ReactNode }> = {
   active:    { label: "Activo",    bg: "bg-emerald-100", text: "text-emerald-700", icon: <CheckCircle2 size={14} /> },
   suspended: { label: "Suspendido",bg: "bg-amber-100",   text: "text-amber-700",   icon: <XCircle size={14} /> },
@@ -42,7 +61,19 @@ function EscanearQrContenido() {
     setEmpleado(null);
     try {
       const resp = await escanearQrAutenticado(t);
-      setEmpleado(resp);
+      
+      // El backend devuelve { employee, enabled, status, visibilityLevel, message }
+      // Extrae el objeto employee si existe, de lo contrario usa resp directamente
+      const empleadoData = (resp as any)?.employee || resp;
+      
+      if (!empleadoData) {
+        toast.error("No se pudo obtener los datos del empleado.");
+        return;
+      }
+      
+      // Mapear los campos del backend al tipo QrEmployeeView esperado
+      const empleadoMapeado = mapBackendEmployeeToQrView(empleadoData);
+      setEmpleado(empleadoMapeado);
     } catch (err) {
       const raw = err instanceof Error ? err.message : "";
       toast.error(translateBackendError(raw) || "Token QR inválido o expirado.");

@@ -196,9 +196,9 @@ export default function UserProfileCard({
     return () => { cancelado = true; };
   }, [isAdmin, user.cargoId, user.idFuncionario]);
 
-  // Renderizado local del QR: encodea la URL pública de validación
-  // `https://www.devcorebits.com/validation/qr/<token>`. Cuando alguien
-  // escanea el QR, llega a la ruta /validation/qr/[token] del frontend, que
+  // Renderizado local del QR: encodea la URL pública de validación.
+  // Siempre usa la URL de producción (https://www.devcorebits.com)
+  // Cuando alguien escanea el QR, llega a la ruta /validation/qr/[token] del frontend, que
   // hace POST /employees/qr/scan automáticamente y muestra la info del
   // empleado. El token va en la URL (no en el body del QR), así cualquier
   // app de cámara puede abrirlo sin necesidad de pegar nada.
@@ -220,7 +220,7 @@ export default function UserProfileCard({
       errorCorrectionLevel: "M",
       color: { dark: "#0F1819", light: "#FFFFFF" },
     })
-      .then((url) => {
+      .then((url: string) => {
         if (!cancelado) setQrImageUrl(url);
       })
       .catch(() => {

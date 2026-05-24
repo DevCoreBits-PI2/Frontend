@@ -32,11 +32,31 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { escanearQrAutenticado } from "@/services/qrService";
+import { escanearQrPublico, escanearQrAutenticado } from "@/services/qrService";
 import { translateBackendError } from "@/lib/api/translateError";
+import { createClient } from "@/utils/supabase/client";
 import type { QrEmployeeView } from "@/types/api/employee";
 
 type EstadoSrc = "active" | "suspended" | "retired" | "inactive" | "invited" | (string & {});
+
+// Adaptador para mapear la respuesta del backend al tipo QrEmployeeView
+function mapBackendEmployeeToQrView(backendEmployee: any): QrEmployeeView {
+  return {
+    id: backendEmployee.id_employee || backendEmployee.id,
+    first_name: backendEmployee.first_name,
+    last_name: backendEmployee.last_name,
+    email: backendEmployee.email,
+    photo_url: backendEmployee.photo_url || null,
+    status: backendEmployee.status,
+    position: backendEmployee.position ? {
+      id: backendEmployee.position.id || backendEmployee.position.id_position || 0,
+      name: backendEmployee.position.name,
+    } : undefined,
+    area: backendEmployee.area,
+    code: backendEmployee.code,
+    manager: backendEmployee.manager,
+  };
+}
 
 const ESTADO_CONFIG: Record<
   string,
@@ -63,29 +83,71 @@ export default function ValidarQrPage() {
       setLoading(false);
       return;
     }
-    let cancelado = false;
-    setLoading(true);
-    setError(null);
-    setEmpleado(null);
 
-    // `escanearQrAutenticado` no pasa `skipAuth: true` — el cliente intenta
-    // adjuntar el Bearer si hay sesión Supabase. Si no hay, va sin él y el
-    // backend responde con la info pública (OptionalAuthGuard).
-    escanearQrAutenticado(decodeURIComponent(tokenParam))
-      .then((resp) => {
-        if (!cancelado) setEmpleado(resp);
-      })
-      .catch((err) => {
+    let cancelado = false;
+    
+    const cargarEmpleado = async () => {
+      try {
+        // Paso 1: Detectar si hay sesión activa
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        console.log("[qr-validation] Sesión detectada:", !!session);
+        
         if (cancelado) return;
-        const raw = err instanceof Error ? err.message : "";
-        setError(
-          translateBackendError(raw) ||
-            "Este QR no es válido o ya expiró. Pide al empleado que genere uno nuevo.",
-        );
-      })
-      .finally(() => {
-        if (!cancelado) setLoading(false);
-      });
+
+        try {
+          setLoading(true);
+          setError(null);
+          setEmpleado(null);
+
+          const decodedToken = decodeURIComponent(tokenParam);
+          
+          // Paso 2: Elegir endpoint según sesión
+          // - Con sesión: escanearQrAutenticado() → info ampliada (incluye manager)
+          // - Sin sesión: escanearQrPublico() → info pública (sin auth)
+          const resp = session
+            ? await escanearQrAutenticado(decodedToken)
+            : await escanearQrPublico(decodedToken);
+
+          console.log("[qr-validation] Respuesta del backend:", resp);
+
+          if (!cancelado) {
+            // El backend devuelve una estructura envuelta con { employee, enabled, status, visibilityLevel, message }
+            // Extrae el objeto employee si existe, de lo contrario usa resp directamente
+            const empleadoData = (resp as any)?.employee || resp;
+            
+            if (!empleadoData) {
+              setError(
+                "Este QR no es válido o ya expiró. Pide al empleado que genere uno nuevo.",
+              );
+            } else {
+              // Mapear los campos del backend al tipo QrEmployeeView esperado
+              const empleadoMapeado = mapBackendEmployeeToQrView(empleadoData);
+              setEmpleado(empleadoMapeado);
+            }
+          }
+        } catch (err) {
+          if (cancelado) return;
+          const raw = err instanceof Error ? err.message : "";
+          console.error("[qr-validation] Error al escanear QR:", raw);
+          setError(
+            translateBackendError(raw) ||
+              "Este QR no es válido o ya expiró. Pide al empleado que genere uno nuevo.",
+          );
+        } finally {
+          if (!cancelado) setLoading(false);
+        }
+      } catch (err) {
+        if (!cancelado) {
+          console.error("[qr-validation] Error al detectar sesión:", err);
+          setError("Error al procesar el QR. Intenta de nuevo.");
+          setLoading(false);
+        }
+      }
+    };
+
+    cargarEmpleado();
 
     return () => {
       cancelado = true;
