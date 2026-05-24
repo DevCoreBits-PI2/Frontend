@@ -92,23 +92,26 @@ export default function DashboardPage() {
                 icono={Users}
                 etiqueta="Personal Activo"
                 valor={estadisticas.personalActivo}
+                loading={cargando}
               />
               <StatsCard
                 icono={PauseCircle}
                 etiqueta="Suspendidos"
                 valor={estadisticas.suspendidos}
                 etiquetaVariacion={estadisticas.estadoSuspendidos}
+                loading={cargando}
               />
               <StatsCard
                 icono={PersonStanding}
                 etiqueta="Retirados (año actual)"
                 valor={estadisticas.retiradosYTD}
+                loading={cargando}
               />
             </div>
 
             <div className="grid gap-4 xl:grid-cols-2">
-              <CriticalContractAlerts alertas={alertas} />
-              <DepartmentalHierarchy departamentos={departamentos} />
+              <CriticalContractAlerts alertas={alertas} loading={cargando} />
+              <DepartmentalHierarchy departamentos={departamentos} loading={cargando} />
             </div>
           </>
         )}
