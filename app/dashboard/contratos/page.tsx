@@ -9,6 +9,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import ContractStatsBar from "@/components/contracts/ContractStatsBar";
 import ContratosTable from "@/components/contratos/ContratosTable";
 import ContractToast from "@/components/contratos/ContractToast";
+import { RouteGuard } from "@/lib/auth/RouteGuard";
 
 import {
   Contrato,
@@ -57,6 +58,16 @@ function calcularEstadisticas(contratos: Contrato[]): EstadisticasContratos {
 }
 
 export default function PaginaContratos() {
+  // Contratos: solo Admin. Cualquier otro rol que entre por URL directa
+  // verá "Acceso restringido".
+  return (
+    <RouteGuard requireAdmin>
+      <ContratosContenido />
+    </RouteGuard>
+  );
+}
+
+function ContratosContenido() {
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [cargando, setCargando] = useState(true);

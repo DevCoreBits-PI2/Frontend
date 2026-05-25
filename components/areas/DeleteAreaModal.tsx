@@ -12,13 +12,18 @@ interface DeleteAreaModalProps {
 
 export default function DeleteAreaModal({ area, onCerrar, onEliminada }: DeleteAreaModalProps) {
   const [eliminando, setEliminando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const tieneposiciones = area.posiciones > 0;
 
   const manejarEliminar = async () => {
+    if (tieneposiciones) return;
     setEliminando(true);
+    setError(null);
     try {
       await eliminarArea(area.id);
       onEliminada();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo eliminar el área.");
     } finally {
       setEliminando(false);
     }
@@ -42,22 +47,26 @@ export default function DeleteAreaModal({ area, onCerrar, onEliminada }: DeleteA
           </div>
         </div>
 
-        {/* Advertencia de posiciones enlazadas */}
         {tieneposiciones && (
           <div className="flex items-start gap-2.5 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">
             <AlertCircle size={15} className="text-rose-500 shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-semibold text-rose-600">
-                Esta area tiene {area.posiciones} posiciones enlazadas.
+                Esta área tiene {area.posiciones} posición(es) activa(s).
               </p>
               <p className="text-xs text-rose-400 mt-0.5">
-                Todas las posiciones enlazadas deben ser reasignadas o cerradas antes de eliminar esta area.
+                Mueve o elimina las posiciones de esta área antes de eliminarla. El backend rechazará la operación mientras existan posiciones activas.
               </p>
             </div>
           </div>
         )}
 
-        {/* Botones */}
+        {error && (
+          <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-600">
+            {error}
+          </div>
+        )}
+
         <div className="flex items-center justify-end gap-3 pt-1">
           <button
             onClick={onCerrar}
@@ -67,10 +76,11 @@ export default function DeleteAreaModal({ area, onCerrar, onEliminada }: DeleteA
           </button>
           <button
             onClick={manejarEliminar}
-            disabled={eliminando}
-            className="px-4 py-2 text-sm font-semibold text-white bg-rose-500 hover:bg-rose-400 rounded-lg transition-colors disabled:opacity-60"
+            disabled={eliminando || tieneposiciones}
+            title={tieneposiciones ? "No puedes eliminar un área con posiciones activas." : undefined}
+            className="px-4 py-2 text-sm font-semibold text-white bg-rose-500 hover:bg-rose-400 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {eliminando ? "Eliminando..." : "Eliminar Area"}
+            {eliminando ? "Eliminando..." : "Eliminar Área"}
           </button>
         </div>
       </div>

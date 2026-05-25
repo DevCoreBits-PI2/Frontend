@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 
+import toast from "react-hot-toast";
 import { Empleado, obtenerEmpleadoPorId } from "@/services/empleadosService";
 import {
   ResultadoValidacion,
@@ -12,6 +13,7 @@ import {
   crearContrato,
   validarContrato,
 } from "@/services/contratosService";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 import EmpleadoInfoCard from "@/components/contratos/EmpleadoInfoCard";
 import ValidationStatusCard from "@/components/contratos/ValidationStatusCard";
@@ -21,13 +23,24 @@ import AdditionalInformationCard from "@/components/contratos/AdditionalInformat
 const VALIDACION_INICIAL: ResultadoValidacion = {
   rangoFechasValido: true,
   sinSolapamiento: true,
-  presupuestoAprobado: true,
+  duracionValida: true,
 };
+
+function fechaIsoHoy(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function fechaIsoEnUnAnio(): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function PaginaRegistrarContrato() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const empleadoId = params.id;
+  const { authUser } = useAuth();
 
   const [empleado, setEmpleado] = useState<Empleado | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -35,9 +48,8 @@ export default function PaginaRegistrarContrato() {
 
   // Estado del formulario
   const [tipo, setTipo] = useState<TipoContrato>("FIJO");
-  const [fechaInicio, setFechaInicio] = useState("2024-06-01");
-  const [fechaFin, setFechaFin] = useState("2025-05-31");
-  const [salario, setSalario] = useState<number | "">(75000);
+  const [fechaInicio, setFechaInicio] = useState(fechaIsoHoy);
+  const [fechaFin, setFechaFin] = useState(fechaIsoEnUnAnio);
   const [notas, setNotas] = useState("");
   const [documento, setDocumento] = useState<File | null>(null);
 
@@ -61,38 +73,63 @@ export default function PaginaRegistrarContrato() {
   // Validacion en vivo cada vez que cambian los datos relevantes
   useEffect(() => {
     const fechaFinReal = tipo === "INDEFINIDO" ? null : fechaFin;
-    const salarioNumero = typeof salario === "number" ? salario : 0;
-
-    validarContrato(empleadoId, fechaInicio, fechaFinReal, salarioNumero).then(setValidacion);
-  }, [empleadoId, tipo, fechaInicio, fechaFin, salario]);
+    validarContrato(empleadoId, fechaInicio, fechaFinReal, undefined, tipo).then(setValidacion);
+  }, [empleadoId, tipo, fechaInicio, fechaFin]);
 
   const formularioValido = useMemo(() => {
     if (!fechaInicio) return false;
-    if (typeof salario !== "number" || salario <= 0) return false;
     if (tipo !== "INDEFINIDO" && !fechaFin) return false;
     return (
       validacion.rangoFechasValido &&
       validacion.sinSolapamiento &&
-      validacion.presupuestoAprobado
+      validacion.duracionValida
     );
-  }, [fechaInicio, fechaFin, salario, tipo, validacion]);
+  }, [fechaInicio, fechaFin, tipo, validacion]);
 
   const handleGuardar = async () => {
     if (!formularioValido || guardando) return;
+    if (!documento) {
+      toast.error("Debes adjuntar el PDF del contrato.");
+      return;
+    }
+    // `id_manager` en `contracts` es Int sin FK ([schema.prisma]). El backend
+    // acepta tanto un id_employee como un adminId. Si el empleado ya tiene un
+    // manager asignado, lo usamos; si no, cae al id del usuario logueado
+    // (admin o HT empleado). Sólo bloqueamos si la sesión no resuelve ninguno.
+    const sessionActorId = authUser?.adminId ?? authUser?.employeeId ?? null;
+    if (!empleado?.managerId && !sessionActorId) {
+      toast.error("No se pudo identificar el manager del contrato (sesión sin id de admin ni de empleado).");
+      return;
+    }
     setGuardando(true);
     try {
       await crearContrato({
         idEmpleado: empleadoId,
+        idManager: empleado?.managerId ?? sessionActorId!,
         tipo,
         fechaInicio,
         fechaFin: tipo === "INDEFINIDO" ? null : fechaFin,
-        salarioBase: typeof salario === "number" ? salario : 0,
         notas,
-        documentoNombre: documento?.name,
+        archivoPdf: documento,
       });
+      // El toast de éxito ("Contrato creado con éxito") lo dispara la página
+      // destino al detectar `?creado=1`. No lo mostramos acá para evitar el
+      // duplicado visual (dos toasts apilados).
       router.push(`/dashboard/empleados/${empleadoId}/contratos?creado=1`);
     } catch (e) {
-      console.error(e);
+      // Traducimos mensajes técnicos del backend a español user-friendly.
+      const rawMsg = e instanceof Error ? e.message : "";
+      const lower = rawMsg.toLowerCase();
+      let msg = rawMsg || "No se pudo registrar el contrato.";
+      if (lower.includes("already has an active contract") || lower.includes("overlapping")) {
+        msg = "Este empleado ya tiene un contrato activo que se solapa con las fechas elegidas. Anula el contrato vigente o ajusta las fechas para que no se crucen.";
+      } else if (lower.includes("end date must be after start date")) {
+        msg = "La fecha de fin debe ser posterior a la de inicio.";
+      } else if (lower.includes("end date is required")) {
+        msg = "Este tipo de contrato requiere una fecha de fin.";
+      }
+      toast.error(msg);
+    } finally {
       setGuardando(false);
     }
   };
@@ -171,10 +208,8 @@ export default function PaginaRegistrarContrato() {
                   />
 
                   <AdditionalInformationCard
-                    salario={salario}
                     notas={notas}
                     documento={documento}
-                    onSalarioChange={setSalario}
                     onNotasChange={setNotas}
                     onDocumentoChange={setDocumento}
                   />

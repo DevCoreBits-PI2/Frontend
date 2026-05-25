@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ChevronRight, ChevronDown, TrendingUp } from "lucide-react";
 import { Empleado, obtenerEmpleadoPorId, guardarEvaluacion, Evaluation } from "@/services/empleadosService";
+import toast from "react-hot-toast";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -131,6 +133,7 @@ export default function EvaluacionEmpleadoPage() {
   const router  = useRouter();
   const params  = useParams();
   const empId   = params?.id as string;
+  const { authUser } = useAuth();
 
   const [empleado, setEmpleado]         = useState<Empleado | null>(null);
   const [cargando, setCargando]         = useState(true);
@@ -371,23 +374,37 @@ export default function EvaluacionEmpleadoPage() {
             <button
               onClick={async () => {
                 if (!empleado) return;
-                // Construir payload de evaluación
+                // Construir payload de evaluación.
+                // IMPORTANTE: la fecha debe ir en ISO (YYYY-MM-DD). El backend
+                // valida con @IsDate(); `toLocaleDateString()` produce formatos
+                // dependientes del locale que pueden fallar la validación y
+                // dejar la evaluación huérfana (sin career_history).
                 const evalObj: Evaluation = {
                   id: `${Date.now()}`,
                   title: `Revisión ${period}`,
                   reviewer: "Usuario Actual",
-                  date: new Date().toLocaleDateString(),
+                  date: new Date().toISOString().slice(0, 10),
                   score: parseFloat(compositeScore),
                   isRecent: true,
                   competencies: competencies.map((c) => ({ name: c.label, score: parseFloat(c.score.toFixed(2)) })),
                   observations,
                 };
 
+                // `id_director` en BD es un Int sin FK (puede ser id de admin o
+                // de empleado). Si el usuario logueado es admin, usamos adminId;
+                // si es empleado (HumanTalent), usamos employeeId.
+                const directorId = authUser?.adminId ?? authUser?.employeeId ?? null;
+                if (!directorId) {
+                  toast.error("No se identificó al evaluador (sesión sin id de admin ni de empleado).");
+                  return;
+                }
                 try {
-                  await guardarEvaluacion(empId, evalObj);
-                  // Redirigir al detalle del empleado para ver la evaluación en desempeño
+                  await guardarEvaluacion(empId, evalObj, directorId);
+                  toast.success("Evaluación guardada.");
                   router.push(`/dashboard/empleados/${empId}`);
                 } catch (err) {
+                  const mensaje = err instanceof Error ? err.message : "No se pudo guardar la evaluación.";
+                  toast.error(mensaje);
                   console.error("Error guardando evaluación:", err);
                 }
               }}

@@ -1,24 +1,9 @@
-import { RegistroDTO } from "@/types/funcionario";
+// Invitación de un nuevo empleado (alias histórico).
+// Usa el cliente central con bearer token; el endpoint exige HumanTalent | Admin.
 
-// Verificación de la invitación que irá como token en la URL.
+import { apiPost } from "@/lib/api/client";
+import { EMPLOYEES } from "@/lib/api/endpoints";
+import type { EmployeeDto, InviteUserPayload } from "@/types/api/employee";
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
-
-export const registerUser = async (data: RegistroDTO) => {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-  const res = await fetch(`${apiUrl}employees/inviteUser`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!res.ok) {
-    throw new Error("Error al registrar usuario");
-  }
-
-  return res.json();
-};
-
-
+export const registerUser = async (data: InviteUserPayload): Promise<EmployeeDto> =>
+  apiPost<EmployeeDto>(EMPLOYEES.invite, data);

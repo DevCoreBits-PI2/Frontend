@@ -7,7 +7,9 @@ export type TipoContrato =
   | "Término Fijo"
   | "Término Indefinido"
   | "Servicio"
-  | "Pasantía";
+  | "Pasantía"
+  | "Aprendizaje"
+  | "Obra o Labor";
 
 export interface FuncionarioResumen {
   nombre: string;

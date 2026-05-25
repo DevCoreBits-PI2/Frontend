@@ -1,4 +1,23 @@
-// Backend simulado — reemplazar por fetch real a Supabase cuando este disponible
+// Servicio de Áreas — integrado con el Gateway real.
+// Conserva la forma `Area` que usan los componentes existentes y mapea
+// el backend (snake_case + status en inglés) hacia UI (estado en español).
+//
+// Endpoints (gateway):
+//   POST    /administrative-data/areas/create-area    [HumanTalentAssistant | HumanTalentLead | Admin]
+//   GET     /administrative-data/areas/find-all-areas (público)
+//   GET     /administrative-data/areas/find-area/:id  (público)
+//   PATCH   /administrative-data/areas/update-area/:id
+//   DELETE  /administrative-data/areas/delete-area/:id
+
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api/client";
+import { AREAS } from "@/lib/api/endpoints";
+import { normalizePaginated } from "@/types/api/common";
+import type {
+  AreaDto,
+  CreateAreaPayload,
+  UpdateAreaPayload,
+  AreaPaginationQuery,
+} from "@/types/api/area";
 
 export interface Area {
   id: string;
@@ -8,87 +27,75 @@ export interface Area {
   estado: "ACTIVO" | "INACTIVO" | "EN_REVISION";
   color: string;
   icono: string;
+  idAdministrator: number;
 }
 
-const AREAS_MOCK: Area[] = [
-  {
-    id: "1",
-    nombre: "Departamento de Ingenieria",
-    descripcion: "Desarrollo de software, QA y DevOps...",
-    posiciones: 42,
-    estado: "ACTIVO",
-    color: "#3B82F6",
-    icono: "ingenieria",
-  },
-  {
-    id: "2",
-    nombre: "Cumplimiento Corporativo",
-    descripcion: "Estandares regulatorios y politicas internas...",
-    posiciones: 12,
-    estado: "ACTIVO",
-    color: "#8B5CF6",
-    icono: "cumplimiento",
-  },
-  {
-    id: "3",
-    nombre: "Operaciones Financieras",
-    descripcion: "Contabilidad, nomina y gestion presupuestaria...",
-    posiciones: 28,
-    estado: "ACTIVO",
-    color: "#F59E0B",
-    icono: "finanzas",
-  },
-  {
-    id: "4",
-    nombre: "Marketing y Comunicaciones",
-    descripcion: "Estrategia de marca, PR y marketing digital...",
-    posiciones: 18,
-    estado: "ACTIVO",
-    color: "#EC4899",
-    icono: "marketing",
-  },
-  {
-    id: "5",
-    nombre: "Exito del Cliente",
-    descripcion: "Soporte al cliente y gestion de cuentas...",
-    posiciones: 35,
-    estado: "ACTIVO",
-    color: "#10B981",
-    icono: "clientes",
-  },
-  {
-    id: "6",
-    nombre: "Recursos Humanos",
-    descripcion: "Adquisicion de talento, cultura y beneficios...",
-    posiciones: 15,
-    estado: "ACTIVO",
-    color: "#F97316",
-    icono: "rrhh",
-  },
-];
+const COLOR_POR_INDICE = ["#3B82F6", "#8B5CF6", "#F59E0B", "#EC4899", "#10B981", "#F97316"];
+const ICONO_POR_DEFECTO = "ingenieria";
 
-export const obtenerAreas = async (): Promise<Area[]> => {
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  return AREAS_MOCK;
+function colorPara(id: number): string {
+  return COLOR_POR_INDICE[id % COLOR_POR_INDICE.length];
+}
+
+function dtoToArea(dto: AreaDto): Area {
+  const id = dto.id ?? dto.id_area ?? 0;
+  const posiciones =
+    dto.positions_count ??
+    dto._count?.positions ??
+    0;
+
+  return {
+    id: String(id),
+    nombre: dto.name,
+    descripcion: dto.description,
+    posiciones,
+    estado: dto.status === "active" ? "ACTIVO" : "INACTIVO",
+    color: colorPara(id),
+    icono: ICONO_POR_DEFECTO,
+    idAdministrator: dto.id_administrator,
+  };
+}
+
+function areaToCreatePayload(area: Omit<Area, "id">): CreateAreaPayload {
+  return {
+    name: area.nombre,
+    description: area.descripcion,
+    id_administrator: area.idAdministrator,
+    status: area.estado === "ACTIVO" ? "active" : "inactive",
+  };
+}
+
+function areaToUpdatePayload(area: Partial<Area>): UpdateAreaPayload {
+  const payload: UpdateAreaPayload = {};
+  if (area.nombre !== undefined) payload.name = area.nombre;
+  if (area.descripcion !== undefined) payload.description = area.descripcion;
+  if (area.idAdministrator !== undefined) payload.id_administrator = area.idAdministrator;
+  if (area.estado !== undefined) {
+    payload.status = area.estado === "ACTIVO" ? "active" : "inactive";
+  }
+  return payload;
+}
+
+export const obtenerAreas = async (query?: AreaPaginationQuery): Promise<Area[]> => {
+  const data = await apiGet<unknown>(AREAS.findAll, { query: query as Record<string, string | number | boolean | undefined> });
+  return normalizePaginated<AreaDto>(data).map(dtoToArea);
+};
+
+export const obtenerAreaPorId = async (id: number | string): Promise<Area> => {
+  const dto = await apiGet<AreaDto>(AREAS.findOne(id));
+  return dtoToArea(dto);
 };
 
 export const crearArea = async (datos: Omit<Area, "id">): Promise<Area> => {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  const nueva: Area = { ...datos, id: Date.now().toString() };
-  AREAS_MOCK.push(nueva);
-  return nueva;
+  const dto = await apiPost<AreaDto>(AREAS.create, areaToCreatePayload(datos));
+  return dtoToArea(dto);
 };
 
 export const editarArea = async (id: string, datos: Partial<Area>): Promise<Area> => {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  const index = AREAS_MOCK.findIndex((a) => a.id === id);
-  if (index === -1) throw new Error("Area no encontrada");
-  AREAS_MOCK[index] = { ...AREAS_MOCK[index], ...datos };
-  return AREAS_MOCK[index];
+  const dto = await apiPatch<AreaDto>(AREAS.update(id), areaToUpdatePayload(datos));
+  return dtoToArea(dto);
 };
 
 export const eliminarArea = async (id: string): Promise<void> => {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  const index = AREAS_MOCK.findIndex((a) => a.id === id);
-  if (index !== -1) AREAS_MOCK.splice(index, 1);
+  await apiDelete(AREAS.remove(id));
 };

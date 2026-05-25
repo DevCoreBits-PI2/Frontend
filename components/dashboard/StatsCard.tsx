@@ -10,6 +10,7 @@ interface StatsCardProps {
   variacion?: number;
   etiquetaVariacion?: string;
   colorIcono?: string;
+  loading?: boolean;
 }
 
 export default function StatsCard({
@@ -19,6 +20,7 @@ export default function StatsCard({
   variacion,
   etiquetaVariacion,
   colorIcono = "text-emerald-500",
+  loading = false,
 }: StatsCardProps) {
   const esPositivo = variacion !== undefined && variacion >= 0;
   const colorVariacion = esPositivo ? "text-emerald-500" : "text-rose-500";
@@ -40,7 +42,13 @@ export default function StatsCard({
         )}
       </div>
       <p className="text-sm text-[#8aa3ad] mb-1">{etiqueta}</p>
-      <p className="text-3xl font-bold text-[#0F1819]">{valor.toLocaleString()}</p>
+      {loading ? (
+        <div className="h-8 bg-gradient-to-r from-[#e4ebee] to-[#d0dce1] rounded-lg animate-pulse" />
+      ) : (
+        <p className="text-3xl font-bold text-[#0F1819]">
+          {typeof valor === "number" ? valor.toLocaleString() : valor}
+        </p>
+      )}
     </div>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import { Position } from "@/types/orgChart";
 import {
   User, Cloud, Code2, Crown, Shield,
-  ChevronDown, ArrowUpDown, X, Plus, Link2Off,
+  ChevronDown, X, Plus, Link2Off, Save,
 } from "lucide-react";
 
 const ICON_MAP = { crown: Crown, person: User, cloud: Cloud, code: Code2, shield: Shield };
@@ -15,35 +16,82 @@ const ICON_BG: Record<string, string> = {
   crown:  "bg-amber-100 text-amber-600",
 };
 
+const NO_SUPERIOR_VALUE = "";
+
 interface Props {
   position: Position | null;
   allPositions: Position[];
-  superior: string;
+  /** Id (string del numérico) del superior seleccionado en la UI, o "" para "sin superior". */
+  superiorId: string;
   reports: string[];
-  onSuperiorChange: (v: string) => void;
+  onSuperiorIdChange: (v: string) => void;
   onReportsChange: (v: string[]) => void;
+  /** Si se omite, los controles de edición se ocultan (modo solo lectura). */
+  onSaveSuperior?: () => void;
+  superiorSaving?: boolean;
   onClose: () => void;
   onDetach?: () => void;
+  /** Cuando es `true`, el panel renderiza solo información (sin select de
+   *  superior editable, sin botón "Guardar", sin botón "Desvincular").
+   *  Default: false. */
+  readOnly?: boolean;
+}
+
+/** Devuelve el set de IDs de la posición y todos sus descendientes. */
+function collectSelfAndDescendants(rootId: string, all: Position[]): Set<string> {
+  const childrenByParent = new Map<string, Position[]>();
+  for (const p of all) {
+    if (p.parentId == null) continue;
+    const list = childrenByParent.get(p.parentId) ?? [];
+    list.push(p);
+    childrenByParent.set(p.parentId, list);
+  }
+  const out = new Set<string>([rootId]);
+  const stack = [rootId];
+  while (stack.length) {
+    const id = stack.pop()!;
+    for (const child of childrenByParent.get(id) ?? []) {
+      if (!out.has(child.id)) {
+        out.add(child.id);
+        stack.push(child.id);
+      }
+    }
+  }
+  return out;
 }
 
 export default function PositionDetailPanel({
   position,
   allPositions,
-  superior,
+  superiorId,
   reports,
-  onSuperiorChange,
+  onSuperiorIdChange,
   onReportsChange,
+  onSaveSuperior,
+  superiorSaving = false,
   onClose,
   onDetach,
+  readOnly = false,
 }: Props) {
+  const blockedIds = useMemo(
+    () => (position ? collectSelfAndDescendants(position.id, allPositions) : new Set<string>()),
+    [position, allPositions],
+  );
+
+  // Opciones válidas como nuevo superior: cualquier posición que no sea la
+  // propia ni un descendiente (evita ciclos). Incluye nodos raíz.
+  const superiorOptions = useMemo(
+    () => (position ? allPositions.filter((p) => !blockedIds.has(p.id)) : []),
+    [position, allPositions, blockedIds],
+  );
+
   if (!position) return null;
 
   const Icon = ICON_MAP[position.iconType] ?? User;
   const iconColors = ICON_BG[position.iconType] ?? ICON_BG.person;
 
-  const superiorOptions = allPositions.filter(
-    (p) => p.id !== position.id && p.level < position.level
-  );
+  const currentParentId = position.parentId ?? NO_SUPERIOR_VALUE;
+  const isDirty = superiorId !== currentParentId;
 
   const removeReport = (name: string) =>
     onReportsChange(reports.filter((r) => r !== name));
@@ -77,44 +125,55 @@ export default function PositionDetailPanel({
       </div>
 
       <div className="flex flex-col gap-5 px-5 py-5 flex-1">
-        {/* Superior Position */}
+        {/* Posición Superior — editable solo si tenemos onSaveSuperior y no
+            estamos en readOnly. */}
         <div>
           <span className="text-[10px] font-bold tracking-widest uppercase text-[#8aa3ad] block mb-2">
             Posición Superior
           </span>
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <select
-                value={superior}
-                onChange={(e) => onSuperiorChange(e.target.value)}
-                className="w-full appearance-none bg-white border border-[#d1dde2] rounded-xl px-3 py-2.5 text-sm text-[#0F1819] font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer pr-8 transition-colors hover:border-[#b0c4cc]"
-              >
-                {superiorOptions.length > 0
-                  ? superiorOptions.map((p) => (
-                      <option key={p.id} value={p.name}>{p.name}</option>
-                    ))
-                  : <option value={superior}>{superior || "—"}</option>
-                }
-              </select>
-              <ChevronDown
-                size={14}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8aa3ad] pointer-events-none"
-              />
+          {readOnly || !onSaveSuperior ? (
+            <div className="rounded-xl border border-[#e8eef0] bg-[#fafcfc] px-3 py-2.5 text-sm text-[#0F1819]">
+              {position.superiorName ?? "Sin superior — posición raíz"}
             </div>
-            <button
-              title="Intercambiar posición"
-              className="p-2.5 border border-[#d1dde2] rounded-xl text-[#8aa3ad] hover:text-[#0F1819] hover:border-[#b0c4cc] transition-colors"
-            >
-              <ArrowUpDown size={14} />
-            </button>
-          </div>
-          <p className="text-[11px] text-[#8aa3ad] leading-relaxed mt-2">
-            Cambiar la posición superior moverá automáticamente todos los reportes directos de{" "}
-            <span className="text-[#4a7880] font-medium">{position.name}</span> bajo la nueva estructura.
-          </p>
+          ) : (
+            <>
+              <div className="relative">
+                <select
+                  value={superiorId}
+                  onChange={(e) => onSuperiorIdChange(e.target.value)}
+                  disabled={superiorSaving}
+                  className="w-full appearance-none bg-white border border-[#d1dde2] rounded-xl px-3 py-2.5 text-sm text-[#0F1819] font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer pr-8 transition-colors hover:border-[#b0c4cc] disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <option value={NO_SUPERIOR_VALUE}>(Sin superior — posición raíz)</option>
+                  {superiorOptions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                      {p.department ? ` — ${p.department}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={14}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8aa3ad] pointer-events-none"
+                />
+              </div>
+              <p className="text-[11px] text-[#8aa3ad] leading-relaxed mt-2">
+                Selecciona la nueva posición superior. No se listan ni la propia posición ni sus descendientes para evitar ciclos.
+              </p>
+              <button
+                onClick={onSaveSuperior}
+                disabled={!isDirty || superiorSaving}
+                className="mt-3 w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save size={14} />
+                {superiorSaving ? "Guardando..." : "Guardar superior"}
+              </button>
+            </>
+          )}
         </div>
 
-        {/* Direct Reports */}
+        {/* Direct Reports — la lista siempre se muestra; el botón "Agregar
+            reporte" y la X de cada uno solo si no es readOnly. */}
         <div>
           <span className="text-[10px] font-bold tracking-widest uppercase text-[#8aa3ad] block mb-2">
             Reportes Directos ({reports.length})
@@ -126,37 +185,46 @@ export default function PositionDetailPanel({
                 className="flex items-center gap-1.5 bg-[#f4f7f8] border border-[#d1dde2] text-xs text-[#0F1819] font-medium px-2.5 py-1 rounded-lg"
               >
                 {name}
-                <button
-                  onClick={() => removeReport(name)}
-                  className="text-[#8aa3ad] hover:text-rose-500 transition-colors"
-                >
-                  <X size={10} />
-                </button>
+                {!readOnly && (
+                  <button
+                    onClick={() => removeReport(name)}
+                    className="text-[#8aa3ad] hover:text-rose-500 transition-colors"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
               </span>
             ))}
+            {reports.length === 0 && (
+              <span className="text-[11px] text-[#8aa3ad]">Sin reportes directos.</span>
+            )}
           </div>
-          <button className="flex items-center gap-1 text-emerald-600 hover:text-emerald-500 text-xs font-semibold mt-2.5 transition-colors">
-            <Plus size={12} />
-            Agregar Reporte
-          </button>
+          {!readOnly && (
+            <button className="flex items-center gap-1 text-emerald-600 hover:text-emerald-500 text-xs font-semibold mt-2.5 transition-colors">
+              <Plus size={12} />
+              Agregar Reporte
+            </button>
+          )}
         </div>
 
-        {/* Remove Hierarchy */}
-        <div className="pt-1">
-          <span className="text-sm font-semibold text-[#0F1819] block mb-1.5">
-            Eliminar Jerarquía
-          </span>
-          <p className="text-[11px] text-[#8aa3ad] leading-relaxed mb-3">
-            Desvincular esta posición de la jerarquía la convertirá en un nodo sin asignar. Todos los hijos también perderán su línea de reporte.
-          </p>
-          <button
-            onClick={onDetach}
-            className="w-full flex items-center justify-center gap-2 border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm font-semibold py-2.5 rounded-xl transition-colors"
-          >
-            <Link2Off size={14} />
-            Desvincular de Jerarquía
-          </button>
-        </div>
+        {/* Desvincular jerarquía — solo si no es readOnly y hay handler. */}
+        {!readOnly && onDetach && (
+          <div className="pt-1">
+            <span className="text-sm font-semibold text-[#0F1819] block mb-1.5">
+              Eliminar Jerarquía
+            </span>
+            <p className="text-[11px] text-[#8aa3ad] leading-relaxed mb-3">
+              Desvincular esta posición de la jerarquía la convertirá en un nodo sin asignar. Todos los hijos también perderán su línea de reporte.
+            </p>
+            <button
+              onClick={onDetach}
+              className="w-full flex items-center justify-center gap-2 border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm font-semibold py-2.5 rounded-xl transition-colors"
+            >
+              <Link2Off size={14} />
+              Desvincular de Jerarquía
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

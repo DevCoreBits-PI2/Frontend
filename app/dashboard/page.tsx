@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Users, PauseCircle, PersonStanding } from "lucide-react";
 
 import Header from "@/components/Header";
@@ -9,6 +10,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import StatsCard from "@/components/dashboard/StatsCard";
 import CriticalContractAlerts from "@/components/dashboard/CriticalContractAlerts";
 import DepartmentalHierarchy from "@/components/dashboard/DepartmentalHierarchy";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 import {
   obtenerEstadisticas,
@@ -21,13 +23,26 @@ import {
 import { NodoOrg } from "@/types/orgChart";
 
 export default function DashboardPage() {
-const [estadisticas, setEstadisticas] = useState<EstadisticaDashboard | null>(null);
+  const router = useRouter();
+  const { ready, authUser } = useAuth();
+  const [estadisticas, setEstadisticas] = useState<EstadisticaDashboard | null>(null);
   const [alertas, setAlertas] = useState<AlertaContrato[]>([]);
   const [departamentos, setDepartamentos] = useState<NodoOrg[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Panel Principal reservado para administradores. Cualquier otro rol
+  // (HT, jefes, empleados) lo redirigimos a su perfil personal, que es la
+  // pantalla por defecto para ellos.
   useEffect(() => {
+    if (!ready) return;
+    if (!authUser?.isAdmin) {
+      router.replace("/dashboard/perfil");
+    }
+  }, [ready, authUser?.isAdmin, router]);
+
+  useEffect(() => {
+    if (!ready || !authUser?.isAdmin) return;
     Promise.all([
       obtenerEstadisticas(),
       obtenerAlertasContratos(),
@@ -40,7 +55,13 @@ const [estadisticas, setEstadisticas] = useState<EstadisticaDashboard | null>(nu
       })
       .catch(() => setError("No se pudieron cargar los datos del dashboard."))
       .finally(() => setCargando(false));
-  }, []);
+  }, [ready, authUser?.isAdmin]);
+
+  // Mientras se confirma que es admin (o se redirige), no renderizamos el
+  // contenido — evita parpadeo de stats que el usuario no debería ver.
+  if (!ready || !authUser?.isAdmin) {
+    return <LoadingSpinner mensaje="Cargando panel principal..." />;
+  }
 
   return (
     <div className="flex min-h-full w-full flex-col bg-platinum-50">
@@ -65,38 +86,36 @@ const [estadisticas, setEstadisticas] = useState<EstadisticaDashboard | null>(nu
         {!cargando && !error && estadisticas && (
           <>
             <div className="mb-6 grid gap-4 md:grid-cols-3">
+              {/* Las variaciones porcentuales se quitaron: no hay cómputo
+                  real de "vs mes anterior", así que mostrar "+0%" mentía. */}
               <StatsCard
                 icono={Users}
                 etiqueta="Personal Activo"
                 valor={estadisticas.personalActivo}
-                variacion={estadisticas.variacionPersonalActivo}
+                loading={cargando}
               />
               <StatsCard
                 icono={PauseCircle}
                 etiqueta="Suspendidos"
                 valor={estadisticas.suspendidos}
                 etiquetaVariacion={estadisticas.estadoSuspendidos}
+                loading={cargando}
               />
               <StatsCard
                 icono={PersonStanding}
                 etiqueta="Retirados (año actual)"
                 valor={estadisticas.retiradosYTD}
-                variacion={estadisticas.variacionRetirados}
+                loading={cargando}
               />
             </div>
 
             <div className="grid gap-4 xl:grid-cols-2">
-              <CriticalContractAlerts alertas={alertas} />
-              <DepartmentalHierarchy departamentos={departamentos} />
+              <CriticalContractAlerts alertas={alertas} loading={cargando} />
+              <DepartmentalHierarchy departamentos={departamentos} loading={cargando} />
             </div>
           </>
         )}
       </main>
-
-      <button className="fixed bottom-6 right-6 z-50 rounded-2xl bg-emerald-500 px-6 py-3.5 text-sm font-bold text-white shadow-lg transition-colors hover:bg-emerald-400">
-        Evaluaciones
-      </button>
-
     </div>
   );
 }

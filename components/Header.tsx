@@ -79,7 +79,7 @@ export default function Header({ user }: HeaderProps) {
             )}
           </>
         ) : (
-          <p className="text-sm text-gray-400">No autenticado</p>
+          <p className="text-sm text-gray-400"></p>
         )}
       </div>
     </header>

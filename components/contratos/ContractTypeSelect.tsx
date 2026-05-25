@@ -1,18 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
-import { TipoContrato } from "@/services/contratosService";
+import { ChevronDown, Check } from "lucide-react";
+import { TipoContrato, TIPO_CONTRATO_LABEL } from "@/services/contratosService";
 
-interface OpcionTipo {
-  valor: TipoContrato;
-  etiqueta: string;
-  descripcion?: string;
-}
-
-const OPCIONES: OpcionTipo[] = [
-  { valor: "FIJO", etiqueta: "Término Fijo", descripcion: "Beneficios estándar y 40h/semana" },
-  { valor: "INDEFINIDO", etiqueta: "Término Indefinido" },
+const ORDEN: TipoContrato[] = [
+  "FIJO",
+  "INDEFINIDO",
+  "SERVICIO",
+  "TIEMPO_PARCIAL",
+  "APRENDIZAJE",
+  "OBRA",
 ];
 
 interface ContractTypeSelectProps {
@@ -34,46 +32,44 @@ export default function ContractTypeSelect({ valor, onChange }: ContractTypeSele
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const opcionActiva = OPCIONES.find((o) => o.valor === valor) ?? OPCIONES[0];
-  const opcionAlternativa = OPCIONES.find((o) => o.valor !== valor);
-
-  const etiquetaSeleccion =
-    opcionActiva.valor === "FIJO"
-      ? `${opcionActiva.etiqueta} (${opcionActiva.descripcion})`
-      : opcionActiva.etiqueta;
-
   return (
     <div ref={ref} className="relative">
-      {/* Caja del select */}
       <button
         type="button"
         onClick={() => setAbierto((s) => !s)}
         className={`w-full flex items-center justify-between px-3.5 py-2.5 text-sm rounded-lg border transition-colors text-left ${
           abierto
             ? "border-emerald-500 bg-white ring-2 ring-emerald-100"
-            : "border-emerald-500 bg-white"
+            : "border-[#d1dde2] bg-white hover:border-emerald-400"
         } text-[#0F1819]`}
       >
-        <span>{etiquetaSeleccion}</span>
+        <span>{TIPO_CONTRATO_LABEL[valor]}</span>
         <ChevronDown
           size={16}
           className={`text-[#8aa3ad] transition-transform ${abierto ? "rotate-180" : ""}`}
         />
       </button>
 
-      {/* Opcion alternativa flotante (estilo del diseño) */}
-      {abierto && opcionAlternativa && (
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-[calc(100%+8px)] z-20">
-          <button
-            type="button"
-            onClick={() => {
-              onChange(opcionAlternativa.valor);
-              setAbierto(false);
-            }}
-            className="bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-semibold px-3.5 py-2.5 rounded-lg shadow-md border border-emerald-600 whitespace-nowrap transition-colors"
-          >
-            {opcionAlternativa.etiqueta}
-          </button>
+      {abierto && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-20 bg-white border border-[#e8eef0] rounded-lg shadow-lg overflow-hidden">
+          {ORDEN.map((tipo) => (
+            <button
+              key={tipo}
+              type="button"
+              onClick={() => {
+                onChange(tipo);
+                setAbierto(false);
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-sm text-left transition-colors ${
+                tipo === valor
+                  ? "bg-emerald-50 text-emerald-700 font-semibold"
+                  : "text-[#0F1819] hover:bg-[#f4f7f8]"
+              }`}
+            >
+              <span>{TIPO_CONTRATO_LABEL[tipo]}</span>
+              {tipo === valor && <Check size={14} className="text-emerald-500" />}
+            </button>
+          ))}
         </div>
       )}
     </div>

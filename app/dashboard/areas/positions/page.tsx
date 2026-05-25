@@ -16,14 +16,18 @@ import {
   Trash2,
   Eye,
   Plus,
+  RotateCcw,
 } from "lucide-react";
 import {
   obtenerPosiciones,
   crearPosicion,
   editarPosicion,
-  eliminarPosicion,
   type Position,
+  type NuevaPosicionInput,
 } from "@/services/positionsService";
+import { translateBackendError } from "@/lib/api/translateError";
+import { obtenerAreas, type Area } from "@/services/areasService";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES & INTERFACES
@@ -65,7 +69,7 @@ const getColorForIndex = (index: number): string => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface StatusBadgeProps {
-  status: "Active" | "Drafting";
+  status: "Active" | "Inactive";
 }
 
 function StatusBadge({ status }: StatusBadgeProps) {
@@ -78,8 +82,8 @@ function StatusBadge({ status }: StatusBadgeProps) {
   }
 
   return (
-    <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-300">
-      Borrador
+    <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-300">
+      Inactiva
     </span>
   );
 }
@@ -124,8 +128,10 @@ function AvatarStack({ empleados, maxDisplay = 3 }: AvatarStackProps) {
 interface NewPositionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (position: Omit<Position, "id">) => Promise<void>;
+  onSave: (position: NuevaPosicionInput) => Promise<void>;
   isLoading?: boolean;
+  areas: Area[];
+  parentOptions: Position[];
 }
 
 function NewPositionModal({
@@ -133,38 +139,99 @@ function NewPositionModal({
   onClose,
   onSave,
   isLoading = false,
+  areas,
+  parentOptions,
 }: NewPositionModalProps) {
   const [nombre, setNombre] = useState("");
-  const [posicionSuperior, setPosicionSuperior] = useState("");
-  const [estado, setEstado] = useState<"Active" | "Drafting">("Active");
-  const [areaId, setAreaId] = useState("area-1");
+  const [descripcion, setDescripcion] = useState("");
+  const [posicionSuperiorId, setPosicionSuperiorId] = useState<string>("");
+  const [estado, setEstado] = useState<"Active" | "Inactive">("Active");
+  const [areaIdNum, setAreaIdNum] = useState<string>("");
+  const [vacancies, setVacancies] = useState<string>("1");
+  const [baseSalary, setBaseSalary] = useState<string>("");
+  const [error, setError] = useState("");
+
+  // Cuando se abre el modal o cambian las áreas, autoselecciona la primera.
+  useEffect(() => {
+    if (isOpen && !areaIdNum && areas.length > 0) {
+      setAreaIdNum(String(areas[0].id));
+    }
+  }, [isOpen, areas, areaIdNum]);
+
+  const reset = () => {
+    setNombre("");
+    setDescripcion("");
+    setPosicionSuperiorId("");
+    setEstado("Active");
+    setAreaIdNum(areas[0] ? String(areas[0].id) : "");
+    setVacancies("1");
+    setBaseSalary("");
+    setError("");
+  };
 
   const handleSave = async () => {
-    if (!nombre.trim()) return;
+    setError("");
+    // Validaciones alineadas con el backend (`normalizeName` exige 3-100).
+    const n = nombre.trim();
+    if (!n) {
+      setError("El nombre es obligatorio.");
+      return;
+    }
+    if (n.length < 3 || n.length > 100) {
+      setError("El nombre debe tener entre 3 y 100 caracteres.");
+      return;
+    }
+    const d = descripcion.trim();
+    if (!d) {
+      setError("La descripción es obligatoria.");
+      return;
+    }
+    if (d.length < 3 || d.length > 500) {
+      setError("La descripción debe tener entre 3 y 500 caracteres.");
+      return;
+    }
+    if (!areaIdNum) {
+      setError("Selecciona un área.");
+      return;
+    }
+    const vacN = Number(vacancies);
+    if (!Number.isInteger(vacN) || vacN < 1) {
+      setError("Vacantes debe ser un entero ≥ 1.");
+      return;
+    }
+    let salaryN: number | undefined;
+    if (baseSalary.trim()) {
+      const n = Number(baseSalary);
+      if (Number.isNaN(n) || n < 0) {
+        setError("El salario base debe ser un número ≥ 0.");
+        return;
+      }
+      salaryN = n;
+    }
 
-    await onSave({
-      nombre,
-      posicionSuperior: posicionSuperior || null,
-      estado,
-      areaId,
-      empleados: [],
-    });
-
-    setNombre("");
-    setPosicionSuperior("");
-    setEstado("Active");
-    setAreaId("area-1");
+    try {
+      await onSave({
+        nombre: nombre.trim(),
+        description: descripcion.trim(),
+        estado,
+        areaIdNumber: Number(areaIdNum),
+        posicionSuperiorId: posicionSuperiorId ? Number(posicionSuperiorId) : null,
+        vacancies: vacN,
+        baseSalary: salaryN,
+      });
+      reset();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo crear la posición.");
+    }
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-[#BDD5EA] flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#0F1819]">
-            Nueva Posición
-          </h2>
+          <h2 className="text-lg font-semibold text-[#0F1819]">Nueva Posición</h2>
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
@@ -175,9 +242,7 @@ function NewPositionModal({
 
         <div className="px-6 py-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#0F1819] mb-2">
-              Nombre de Posición *
-            </label>
+            <label className="block text-sm font-medium text-[#0F1819] mb-2">Nombre de Posición *</label>
             <input
               type="text"
               value={nombre}
@@ -189,50 +254,88 @@ function NewPositionModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#0F1819] mb-2">
-              Posición Superior
-            </label>
-            <input
-              type="text"
-              value={posicionSuperior}
-              onChange={(e) => setPosicionSuperior(e.target.value)}
-              placeholder="Ej: Engineering Manager"
-              className="w-full px-3 py-2 border border-[#BDD5EA] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-[#0F1819]"
+            <label className="block text-sm font-medium text-[#0F1819] mb-2">Descripción *</label>
+            <textarea
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              placeholder="Responsabilidades, requisitos, etc."
+              rows={3}
+              className="w-full px-3 py-2 border border-[#BDD5EA] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-[#0F1819] resize-none"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[#0F1819] mb-2">Posición Superior</label>
+            <select
+              value={posicionSuperiorId}
+              onChange={(e) => setPosicionSuperiorId(e.target.value)}
+              className="w-full px-3 py-2 border border-[#BDD5EA] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-[#0F1819]"
+            >
+              <option value="">(Sin posición superior)</option>
+              {parentOptions
+                .filter((p) => p.estado === "Active")
+                .map((p) => (
+                  <option key={p.id} value={String(p.rawId)}>
+                    {p.nombre} — {p.areaNombre || "sin área"}
+                  </option>
+                ))}
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-[#0F1819] mb-2">
-                Área
-              </label>
+              <label className="block text-sm font-medium text-[#0F1819] mb-2">Área *</label>
               <select
-                value={areaId}
-                onChange={(e) => setAreaId(e.target.value)}
+                value={areaIdNum}
+                onChange={(e) => setAreaIdNum(e.target.value)}
                 className="w-full px-3 py-2 border border-[#BDD5EA] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-[#0F1819]"
               >
-                <option value="area-1">Tecnología</option>
-                <option value="area-2">Seguridad</option>
-                <option value="area-3">Producto</option>
-                <option value="area-4">Diseño</option>
-                <option value="area-5">Datos</option>
+                {areas.length === 0 && <option value="">— Sin áreas —</option>}
+                {areas.map((a) => (
+                  <option key={a.id} value={a.id}>{a.nombre}</option>
+                ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#0F1819] mb-2">
-                Estado
-              </label>
+              <label className="block text-sm font-medium text-[#0F1819] mb-2">Estado</label>
               <select
                 value={estado}
-                onChange={(e) => setEstado(e.target.value as "Active" | "Drafting")}
+                onChange={(e) => setEstado(e.target.value as "Active" | "Inactive")}
                 className="w-full px-3 py-2 border border-[#BDD5EA] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-[#0F1819]"
               >
                 <option value="Active">Activa</option>
-                <option value="Drafting">Borrador</option>
+                <option value="Inactive">Inactiva</option>
               </select>
             </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[#0F1819] mb-2">Vacantes *</label>
+              <input
+                type="number"
+                min={1}
+                value={vacancies}
+                onChange={(e) => setVacancies(e.target.value)}
+                className="w-full px-3 py-2 border border-[#BDD5EA] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-[#0F1819]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[#0F1819] mb-2">Salario base</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={baseSalary}
+                onChange={(e) => setBaseSalary(e.target.value)}
+                placeholder="Opcional"
+                className="w-full px-3 py-2 border border-[#BDD5EA] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-[#0F1819]"
+              />
+            </div>
+          </div>
+
+          {error && <p className="text-sm text-rose-600">{error}</p>}
         </div>
 
         <div className="px-6 py-4 border-t border-[#BDD5EA] flex justify-end gap-3">
@@ -261,6 +364,10 @@ function NewPositionModal({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function PositionsPage() {
+  const { authUser } = useAuth();
+  // Crear, editar y eliminar posiciones: SOLO Admin. Cualquier otro rol
+  // (incluyendo HT) solo puede ver los detalles.
+  const puedeGestionar = !!authUser?.isAdmin;
   const [posicionAVer, setPosicionAVer] = useState<Position | null>(null); //Nuevos estados
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null); //Nuevos estados
   const [positions, setPositions] = useState<Position[]>([]);
@@ -275,6 +382,33 @@ export default function PositionsPage() {
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [posicionAEditar, setPosicionAEditar] = useState<Position | null>(null);
   const [posicionAEliminar, setPosicionAEliminar] = useState<Position | null>(null);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [todasLasPosiciones, setTodasLasPosiciones] = useState<Position[]>([]);
+
+  // Cargar áreas reales para los selects.
+  useEffect(() => {
+    obtenerAreas()
+      .then(setAreas)
+      .catch((err) => {
+        console.error("Error fetching areas:", err);
+      });
+  }, []);
+
+  // Cargar TODAS las posiciones (sin paginación) — se usa como lista de
+  // posibles "posición superior" en los modales y para validar restricciones
+  // de borrado (subordinados).
+  const fetchTodasLasPosiciones = useCallback(async () => {
+    try {
+      const res = await obtenerPosiciones({ pageSize: 1000 });
+      setTodasLasPosiciones(res.data);
+    } catch (err) {
+      console.error("Error fetching all positions:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTodasLasPosiciones();
+  }, [fetchTodasLasPosiciones]);
 
   // Fetch positions
   const fetchPositions = useCallback(async () => {
@@ -321,22 +455,31 @@ export default function PositionsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleNewPosition = async (positionData: Omit<Position, "id">) => {
+  const handleNewPosition = async (positionData: NuevaPosicionInput) => {
+    // El backend exige `id_administrator` (FK a tabla administrators).
+    // Si es admin → adminId (de GET /api/admin/:id). Si es HT empleado → employeeId.
+    const idAdministrator = authUser?.adminId ?? authUser?.employeeId ?? null;
+    if (!idAdministrator) {
+      setToast({
+        title: "Error",
+        message: "Tu sesión no tiene administrador asociado para crear posiciones.",
+      });
+      return;
+    }
     try {
       setModalLoading(true);
-      await crearPosicion(positionData);
+      await crearPosicion(positionData, idAdministrator);
       setShowNewModal(false);
       setToast({
         title: "Éxito",
         message: "Posición creada correctamente",
       });
-      await fetchPositions();
+      await Promise.all([fetchPositions(), fetchTodasLasPosiciones()]);
     } catch (error) {
+      const raw = error instanceof Error ? error.message : "";
+      const msg = translateBackendError(raw) || "No se pudo crear la posición";
       console.error("Error creating position:", error);
-      setToast({
-        title: "Error",
-        message: "No se pudo crear la posición",
-      });
+      setToast({ title: "Error", message: msg });
     } finally {
       setModalLoading(false);
     }
@@ -354,6 +497,24 @@ export default function PositionsPage() {
     setPosicionAEliminar(position);
   };
 
+  // Reactivar una posición inactiva: el backend solo expone PATCH de la
+  // posición, así que mandamos status=active vía editarPosicion.
+  const handleActivar = useCallback(async (position: Position) => {
+    setOpenMenuId(null);
+    setMenuPos(null);
+    try {
+      await editarPosicion(position.id, { estado: "Active" });
+      setToast({
+        title: "Éxito",
+        message: `Posición "${position.nombre}" reactivada.`,
+      });
+      await Promise.all([fetchPositions(), fetchTodasLasPosiciones()]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "No se pudo reactivar la posición.";
+      setToast({ title: "Error", message: msg });
+    }
+  }, [fetchPositions, fetchTodasLasPosiciones]);
+
 return (
     <div className="min-h-screen bg-[#ECEFF1]">
       {/* Header */}
@@ -370,13 +531,15 @@ return (
             <h1 className="text-2xl font-bold text-[#0F1819]">
               Gestión de Posiciones
             </h1>
-            <button
-              onClick={() => setShowNewModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              Nueva Posición
-            </button>
+            {puedeGestionar && (
+              <button
+                onClick={() => setShowNewModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                Nueva Posición
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -519,30 +682,51 @@ return (
             <Eye className="w-4 h-4" />
             Ver detalles
           </button>
-          <button
-            onClick={() => {
-              const pos = positions.find((p) => p.id === openMenuId);
-              if (pos) {
-                handleAbrirEditar(pos);
-              }
-            }}
-            className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-gray-100 flex items-center gap-2 transition-colors"
-          >
-            <Pencil className="w-4 h-4" />
-            Editar
-          </button>
-          <button
-            onClick={() => {
-              const pos = positions.find((p) => p.id === openMenuId);
-              if (pos) {
-                handleAbrirEliminar(pos);
-              }
-            }}
-            className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-            Eliminar
-          </button>
+          {/* Editar / Activar / Eliminar: solo Admin. Los demás roles ven
+              únicamente "Ver detalles". */}
+          {puedeGestionar && (
+            <>
+              <button
+                onClick={() => {
+                  const pos = positions.find((p) => p.id === openMenuId);
+                  if (pos) {
+                    handleAbrirEditar(pos);
+                  }
+                }}
+                className="w-full px-4 py-2 text-sm text-[#0F1819] hover:bg-gray-100 flex items-center gap-2 transition-colors"
+              >
+                <Pencil className="w-4 h-4" />
+                Editar
+              </button>
+              {(() => {
+                const pos = positions.find((p) => p.id === openMenuId);
+                if (pos?.estado === "Inactive") {
+                  return (
+                    <button
+                      onClick={() => handleActivar(pos)}
+                      className="w-full px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 flex items-center gap-2 transition-colors"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Activar
+                    </button>
+                  );
+                }
+                return null;
+              })()}
+              <button
+                onClick={() => {
+                  const pos = positions.find((p) => p.id === openMenuId);
+                  if (pos) {
+                    handleAbrirEliminar(pos);
+                  }
+                }}
+                className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Eliminar
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -599,24 +783,29 @@ return (
         onClose={() => setShowNewModal(false)}
         onSave={handleNewPosition}
         isLoading={modalLoading}
+        areas={areas}
+        parentOptions={todasLasPosiciones}
       />
       <EditPositionModal
         isOpen={posicionAEditar !== null}
         position={posicionAEditar}
         onClose={() => setPosicionAEditar(null)}
+        areas={areas}
+        parentOptions={todasLasPosiciones}
         onSuccess={async () => {
           setPosicionAEditar(null);
           setToast({
             title: "Éxito",
             message: "Posición actualizada correctamente",
           });
-          await fetchPositions();
+          await Promise.all([fetchPositions(), fetchTodasLasPosiciones()]);
         }}
       />
 
       <DeletePositionModal
         isOpen={posicionAEliminar !== null}
         position={posicionAEliminar}
+        allPositions={todasLasPosiciones}
         onCerrar={() => setPosicionAEliminar(null)}
         onEliminada={async () => {
           setPosicionAEliminar(null);
@@ -624,14 +813,27 @@ return (
             title: "Éxito",
             message: "Posición eliminada con éxito",
           });
-          await fetchPositions();
+          await Promise.all([fetchPositions(), fetchTodasLasPosiciones()]);
+        }}
+        onError={(msg) => {
+          setPosicionAEliminar(null);
+          setToast({ title: "Error", message: msg });
         }}
       />
 
       <ViewPositionModal
         isOpen={posicionAVer !== null}
-        position={posicionAVer}
+        positionId={posicionAVer?.id ?? null}
+        fallback={posicionAVer}
+        areas={areas}
         onCerrar={() => setPosicionAVer(null)}
+        onReactivada={async () => {
+          setToast({
+            title: "Éxito",
+            message: "Posición reactivada correctamente.",
+          });
+          await Promise.all([fetchPositions(), fetchTodasLasPosiciones()]);
+        }}
       />
     </div>
   );

@@ -1,13 +1,14 @@
-export const checkFirstLogin = async (id: string) => {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+// Verifica si el empleado necesita configurar contraseña por primera vez.
+// Usa el cliente central porque el endpoint exige bearer token.
 
-  const res = await fetch(`${apiUrl}/employees/firstTimeSetup/${id}`);
-  const data = await res.json();
+import { apiGet } from "@/lib/api/client";
+import { EMPLOYEES } from "@/lib/api/endpoints";
 
-  if (!res.ok) {
-    throw new Error("Error verificando primer login" + JSON.stringify(data));
-  }
+export interface FirstTimeSetupResponse {
+  mustSetPassword?: boolean;
+  // Cualquier metadatos extra que entregue el backend.
+  [key: string]: unknown;
+}
 
-
-  return data;
-};
+export const checkFirstLogin = async (id: string): Promise<FirstTimeSetupResponse> =>
+  apiGet<FirstTimeSetupResponse>(EMPLOYEES.firstTimeSetup(id));

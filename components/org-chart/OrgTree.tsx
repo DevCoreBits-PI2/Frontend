@@ -8,7 +8,7 @@ import { ZoomIn, ZoomOut, Maximize2, Plus } from "lucide-react";
 const LINE = "#94a3b8";
 
 interface OrgTreeProps {
-  tree: PositionTree;
+  trees: PositionTree[];
   selectedId: string | null;
   onSelect: (pos: Position) => void;
   onAddChild?: (parent: Position) => void;
@@ -57,13 +57,16 @@ function NodeWithChildren({
           {/* Vertical line down from node */}
           <div style={{ width: 1, height: 26, background: LINE }} />
 
-          {/* Add-child button — only for non-root nodes with children */}
-          {!isRoot && (
+          {/* Botón "Agregar posición hija" — solo se muestra cuando hay
+              handler (rol con permisos de edición) y el nodo no es root.
+              En modo solo-lectura, `onAddChild` viene `undefined` y el
+              botón directamente no aparece. */}
+          {!isRoot && onAddChild && (
             <>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onAddChild?.(node);
+                  onAddChild(node);
                 }}
                 title="Agregar posición hija"
                 className="w-6 h-6 rounded-full bg-emerald-500 hover:bg-emerald-400 flex items-center justify-center text-white transition-colors shadow-sm z-10"
@@ -128,7 +131,7 @@ function NodeWithChildren({
 }
 
 export default function OrgTree({
-  tree,
+  trees,
   selectedId,
   onSelect,
   onAddChild,
@@ -214,15 +217,26 @@ export default function OrgTree({
               transition: dragging ? "none" : "transform 0.12s ease-out",
             }}
           >
-            <NodeWithChildren
-              node={tree}
-              selectedId={selectedId}
-              onSelect={onSelect}
-              onAddChild={onAddChild}
-              onEdit={onEdit}
-              onDetach={onDetach}
-              isRoot
-            />
+            {trees.length === 0 ? (
+              <div className="text-sm text-[#8aa3ad] py-12">
+                No hay posiciones para mostrar.
+              </div>
+            ) : (
+              <div className="flex items-start gap-12">
+                {trees.map((tree) => (
+                  <NodeWithChildren
+                    key={tree.id}
+                    node={tree}
+                    selectedId={selectedId}
+                    onSelect={onSelect}
+                    onAddChild={onAddChild}
+                    onEdit={onEdit}
+                    onDetach={onDetach}
+                    isRoot
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
