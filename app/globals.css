@@ -10,6 +10,73 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --animate-slide-in-right: slide-in-right 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+
+  @keyframes slide-in-right {
+    from { opacity: 0; transform: translateX(48px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  /* Custom Color Palette */
+  --color-ink-black-50: #eff5f5;
+  --color-ink-black-100: #dfebec;
+  --color-ink-black-200: #bfd6d9;
+  --color-ink-black-300: #9fc2c6;
+  --color-ink-black-400: #80adb3;
+  --color-ink-black-500: #60999f;
+  --color-ink-black-600: #4d7a80;
+  --color-ink-black-700: #395c60;
+  --color-ink-black-800: #263d40;
+  --color-ink-black-900: #131f20;
+  --color-ink-black-950: #0d1516;
+
+  --color-platinum-50: #f0f3f4;
+  --color-platinum-100: #e2e6e9;
+  --color-platinum-200: #c4ced4;
+  --color-platinum-300: #a7b5be;
+  --color-platinum-400: #8a9ca8;
+  --color-platinum-500: #6c8393;
+  --color-platinum-600: #576975;
+  --color-platinum-700: #414f58;
+  --color-platinum-800: #2b353b;
+  --color-platinum-900: #161a1d;
+  --color-platinum-950: #0f1215;
+
+  --color-charcoal-blue-50: #edf5f7;
+  --color-charcoal-blue-100: #dceaef;
+  --color-charcoal-blue-200: #b9d6df;
+  --color-charcoal-blue-300: #95c1d0;
+  --color-charcoal-blue-400: #72acc0;
+  --color-charcoal-blue-500: #4f98b0;
+  --color-charcoal-blue-600: #3f798d;
+  --color-charcoal-blue-700: #2f5b6a;
+  --color-charcoal-blue-800: #203d46;
+  --color-charcoal-blue-900: #101e23;
+  --color-charcoal-blue-950: #0b1519;
+
+  --color-jet-black-50: #eef4f6;
+  --color-jet-black-100: #ddeaee;
+  --color-jet-black-200: #bcd4dc;
+  --color-jet-black-300: #9abfcb;
+  --color-jet-black-400: #78a9ba;
+  --color-jet-black-500: #5794a8;
+  --color-jet-black-600: #457687;
+  --color-jet-black-700: #345965;
+  --color-jet-black-800: #233b43;
+  --color-jet-black-900: #111e22;
+  --color-jet-black-950: #0c1518;
+
+  --color-pale-sky-50: #ecf3f9;
+  --color-pale-sky-100: #d8e6f3;
+  --color-pale-sky-200: #b1cee7;
+  --color-pale-sky-300: #8bb5da;
+  --color-pale-sky-400: #649dce;
+  --color-pale-sky-500: #3d84c2;
+  --color-pale-sky-600: #316a9b;
+  --color-pale-sky-700: #254f74;
+  --color-pale-sky-800: #18354e;
+  --color-pale-sky-900: #0c1a27;
+  --color-pale-sky-950: #09121b;
 }
 
 @media (prefers-color-scheme: dark) {
