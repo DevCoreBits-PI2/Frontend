@@ -157,7 +157,7 @@ export default function Sidebar() {
   })).filter((g) => g.items.length > 0);
 
   return (
-    <aside className="flex flex-col w-[220px] min-h-screen bg-[#0F1819] shrink-0">
+    <aside className="flex flex-col w-[220px] h-screen sticky top-0 bg-[#0F1819] shrink-0">
       <div className="flex items-center gap-2.5 px-5 py-5 border-b border-[#1E333A]">
         <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center shrink-0">
           <span className="text-white font-bold text-sm">T</span>
@@ -167,7 +167,7 @@ export default function Sidebar() {
         </span>
       </div>
 
-      <nav className="flex flex-col gap-4 px-3 py-4 flex-1">
+      <nav className="flex flex-col gap-4 px-3 py-4 flex-1 overflow-y-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
         {gruposVisibles.map((grupo) => (
           <div key={grupo.titulo} className="flex flex-col gap-1">
             {/* El header del grupo se omite si solo hay un grupo visible
